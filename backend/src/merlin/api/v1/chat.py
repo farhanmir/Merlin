@@ -34,17 +34,17 @@ PROVIDER_MODELS = {
     ],
     "google": [
         ModelInfo(
-            id="gemini/gemini-2.5-pro",
+            id="gemini-2.5-pro",
             name="Gemini 2.5 Pro",
             provider="Google",
         ),
         ModelInfo(
-            id="gemini/gemini-2.5-flash",
+            id="gemini-2.5-flash",
             name="Gemini 2.5 Flash",
             provider="Google",
         ),
         ModelInfo(
-            id="gemini/gemini-2.5-flash-lite",
+            id="gemini-2.5-flash-lite",
             name="Gemini 2.5 Flash-Lite",
             provider="Google",
         ),
