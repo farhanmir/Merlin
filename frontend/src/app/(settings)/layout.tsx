@@ -4,7 +4,7 @@ import { Sidebar } from '@/components/sidebar';
 import { Key, Info, Home } from 'lucide-react';
 
 const navigationItems = [
-  { label: 'Back to Chat', href: '/', icon: Home },
+  { label: 'Back to Chat', href: '/chat', icon: Home },
   { label: 'API Keys', href: '/settings', icon: Key },
   { label: 'About', href: '/settings/about', icon: Info },
 ];

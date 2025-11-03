@@ -35,7 +35,7 @@ export default function AnalyticsPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-8">
         <div className="max-w-6xl mx-auto">
           <Link
-            href="/"
+            href="/chat"
             className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -136,7 +136,7 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between">
           <div>
             <Link
-              href="/"
+              href="/chat"
               className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors mb-2"
             >
               <ArrowLeft className="h-4 w-4" />
