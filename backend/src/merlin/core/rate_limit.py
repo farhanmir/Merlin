@@ -24,9 +24,17 @@ def get_user_id(request: Request) -> str:
 
 
 # Initialize rate limiter
-# 50 requests per hour per user
+# Aligned with Free Tier Constraints:
+# - Neon Free: 5 hours/day active time (most restrictive)
+# - Render Free: 750 hours/month (sufficient for 24/7)
+# - Vercel Free: 100 GB bandwidth/month
+#
+# Conservative limits to preserve Neon's 5-hour daily compute:
+# - 30 requests/hour per user = 150 requests/day per user (5-hour workday)
+# - Assumes ~30 concurrent users max (total: 4,500 req/day)
+# - Keeps Neon active time under 5 hours with efficient queries
 limiter = Limiter(
     key_func=get_user_id,
-    default_limits=["50/hour"],
+    default_limits=["30/hour"],  # Conservative for Neon Free Tier
     storage_uri="memory://",
 )

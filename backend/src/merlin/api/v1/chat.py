@@ -86,7 +86,7 @@ async def list_models(user_id: CurrentUserDep, key_repo: KeyRepoDep) -> ModelLis
 
 
 @router.post("/completions")
-@limiter.limit("50/hour")
+@limiter.limit("30/hour")  # Aligned with Neon Free Tier (5 hours/day active time)
 async def chat_completions(
     request_obj: Request,
     request: ChatRequest,
@@ -99,7 +99,7 @@ async def chat_completions(
     Send a chat completion request with optional streaming for the authenticated user.
 
     Supports OptiLLM techniques by prefixing the model name.
-    Rate limited to 50 requests per hour per user.
+    Rate limited to 30 requests per hour per user to preserve Neon Free Tier limits.
     """
     # Set user_id in request state for rate limiting
     request_obj.state.user_id = user_id

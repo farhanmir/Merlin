@@ -321,7 +321,7 @@ export const useChatStore = create<ChatState>()(
             const retryTime = retryMatch ? `${retryMatch[1]} ${retryMatch[2]}${parseInt(retryMatch[1]) > 1 ? 's' : ''}` : 'a few minutes';
             
             toast.error('Rate limit exceeded', {
-              description: `You've reached the limit of 50 messages per hour. Try again in ${retryTime}.`,
+              description: `You've reached the limit of 30 messages per hour (Neon Free Tier). Try again in ${retryTime}.`,
               duration: 6000,
             });
             
