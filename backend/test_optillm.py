@@ -5,9 +5,9 @@ Tests each technique individually with the riddle.
 
 import asyncio
 import os
+import sys
 
 from merlin.services.optillm_service import OptiLLMService
-from openai import OpenAI
 
 # The riddle to test
 RIDDLE = """What word in the English language does the following: the first two letters signify a male, the first three letters signify a female, the first four letters signify a great, while the entire word signifies a great woman. What is the word?"""
@@ -17,7 +17,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 if not GOOGLE_API_KEY:
     print("ERROR: GOOGLE_API_KEY environment variable not set!")
     print("Set it with: $env:GOOGLE_API_KEY = 'your-key-here'")
-    exit(1)
+    sys.exit(1)
 
 MODEL = "gemini-2.5-flash-lite"  # or "gemini-2.0-flash-exp" if available
 
