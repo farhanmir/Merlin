@@ -31,10 +31,10 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utc_now, onupdate=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
     )
 
     def __repr__(self) -> str:
@@ -52,10 +52,10 @@ class ApiKey(Base):
     encrypted_key: Mapped[str] = mapped_column(Text, nullable=False)
     is_valid: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utc_now, onupdate=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
     )
 
     def __repr__(self) -> str:
@@ -79,7 +79,7 @@ class ChatMessage(Base):
         Text, nullable=True
     )  # JSON string
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utc_now, nullable=False
+        DateTime(timezone=True), default=_utc_now, nullable=False
     )
 
     def __repr__(self) -> str:
