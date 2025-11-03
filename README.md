@@ -207,10 +207,14 @@ Techniques are applied sequentially in the order specified and can dramatically 
 
 ### OptiLLM Errors
 
-**Error: "Value is not a struct"**
-- **Cause**: Google Gemini rejected a message containing code blocks from a previous technique
-- **Solution**: Avoid using `plansearch` with Google, or use it as the last technique in the chain
-- **Note**: Fixed in latest version with automatic code block sanitization
+**Error: "Value is not a struct" or Provider Validation Errors**
+- **Cause**: Google Gemini and other providers reject messages containing code blocks (especially from multi-technique pipelines)
+- **Solution**: This is now automatically handled! All OptiLLM techniques sanitize inputs by stripping code blocks
+- **Technical Details**: 
+  - `moa.py` - Sanitizes queries for critique and final synthesis prompts
+  - `plansearch.py` - Strips code blocks from all problem statements; normalizes implementation responses
+  - `mcts.py` - Cleans initial queries and synthesized follow-up prompts
+  - `rstar.py` - Returns natural-language answers with expanded numeric pattern matching
 
 **Error: "Rate limit exceeded"**
 - **Cause**: Too many API calls in a short time (Google Free: 15 requests/minute)
@@ -224,11 +228,32 @@ Techniques are applied sequentially in the order specified and can dramatically 
 - **Cause**: Heavy techniques (mcts, rstar) make many API calls
 - **Solution**: Use lighter techniques, or use heavy techniques individually
 
-### General Issues
+## Recent OptiLLM Improvements
 
-Enable techniques in the chat interface (Advanced Settings panel) to optimize inference quality and cost.
+### Code Block Sanitization Across Techniques
 
-## Workflow Example: Essay Writer
+To ensure compatibility with all providers (especially Google Gemini), we've implemented automatic code block sanitization across all OptiLLM techniques:
+
+#### What Was Fixed
+1. **MOA (Mixture of Agents)** - Critique and final synthesis prompts now use sanitized queries instead of raw user input
+2. **PlanSearch** - All problem statements are sanitized; implementation responses strip nested markdown fences
+3. **MCTS (Monte Carlo Tree Search)** - Initial queries and synthesized follow-up prompts are cleaned
+4. **R\*Star** - Expanded numeric pattern matching; returns natural-language answers
+
+#### How It Works
+- **Input Sanitization**: Strips triple backticks and code block content, keeping only the conceptual parts
+- **Fallback Logic**: If code blocks comprise the entire input, we keep the pre-code content (usually the main question)
+- **Normalization**: PlanSearch strips nested markdown fences before wrapping implementation code
+
+#### Benefits
+- ✅ All techniques now work reliably with Google Gemini and OpenAI
+- ✅ Reduced "Value is not a struct" validation errors
+- ✅ Multi-technique pipelines stay provider-safe throughout execution
+- ✅ Downstream techniques (e.g., CoT after PlanSearch) receive properly formatted inputs
+
+---
+
+## Troubleshooting
 
 ```bash
 # 1. Create workflow from template
