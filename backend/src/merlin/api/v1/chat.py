@@ -317,55 +317,41 @@ async def chat_completions(
 
     # Call OptiLLM service when techniques are selected
     try:
-        response = await optillm_service.chat_completion(
-            model=request.model,
+        # Apply OptiLLM techniques directly (no HTTP proxy)
+        response_text = await optillm_service.apply_techniques(
+            provider=provider,
+            model=base_model,
             messages=[msg.model_dump() for msg in request.messages],
             api_key=api_key,
             techniques=request.techniques,
-            stream=request.stream,
         )
 
-        if request.stream:
-            # Return streaming response
-            from fastapi.responses import StreamingResponse
-
-            async def stream_generator() -> Any:
-                async for chunk in response:
-                    yield chunk
-
-            return StreamingResponse(
-                stream_generator(),
-                media_type="text/event-stream",
-            )
-        else:
-            # Return complete response
-            return response
-    except httpx.HTTPStatusError as e:
-        # API returned an error status code
-        error_source = "OptiLLM" if request.techniques else "Provider API"
-        error_detail = f"{error_source} error: {e.response.status_code}"
-        try:
-            error_body = e.response.json()
-            if "error" in error_body:
-                error_detail = f"{error_source} error: {error_body['error']}"
-        except Exception:
-            error_detail = f"{error_source} error: {e.response.text[:200]}"
-
-        raise HTTPException(status_code=500, detail=error_detail)
-    except httpx.HTTPError as e:
-        error_source = "OptiLLM" if request.techniques else "Provider API"
+        # OptiLLM integration is non-streaming - return complete response
+        # (Streaming would require async generators from each technique function)
+        return {
+            "id": "chatcmpl-optillm",
+            "object": "chat.completion",
+            "created": 0,
+            "model": request.model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": response_text},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+    except ValueError as e:
+        # Invalid technique or configuration
         raise HTTPException(
-            status_code=500, detail=f"{error_source} request failed: {str(e)}"
+            status_code=400,
+            detail=f"OptiLLM configuration error: {str(e)}",
         )
     except Exception as e:
-        error_hint = (
-            "Try using fewer OptiLLM techniques or a different model."
-            if request.techniques
-            else "Check your API key and model selection."
-        )
+        error_hint = "Try using fewer OptiLLM techniques or a different model."
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error: {str(e)}. {error_hint}",
+            detail=f"OptiLLM execution error: {str(e)}. {error_hint}",
         )
 
 

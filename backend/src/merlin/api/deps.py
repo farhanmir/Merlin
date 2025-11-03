@@ -29,9 +29,9 @@ def get_chat_repository(session: SessionDep) -> ChatMessageRepository:
     return ChatMessageRepository(session)
 
 
-def get_optillm_service(settings: SettingsDep) -> OptiLLMService:
+def get_optillm_service() -> OptiLLMService:
     """Dependency for OptiLLM service."""
-    return OptiLLMService(settings.optillm_url)
+    return OptiLLMService()
 
 
 def get_external_api_service(settings: SettingsDep) -> ExternalAPIService:

@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./merlin.db"
 
-    # OptiLLM
-    optillm_url: str = "http://localhost:8000"
-
     # External APIs (Optional - for workflow steps)
     gptzero_api_key: str = ""  # For AI detection step
     # Note: undetectableai.pro is free and uses browser automation (no API key needed)
