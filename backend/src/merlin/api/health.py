@@ -1,9 +1,7 @@
 from datetime import datetime, timezone
 
-import httpx
 from fastapi import APIRouter, Depends
 from merlin.api.deps import ExternalAPIDep, KeyRepoDep, OptiLLMDep, get_session
-from merlin.core.config import get_settings
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,8 +38,6 @@ async def detailed_health_check(
     Detailed health check for all services and dependencies.
     Returns status of database, OptiLLM, configured API keys, and external APIs.
     """
-    settings = get_settings()
-
     health_status = {
         "timestamp": datetime.now().isoformat(),
         "overall_status": "healthy",
@@ -64,28 +60,29 @@ async def detailed_health_check(
         }
         health_status["overall_status"] = "degraded"
 
-    # Check OptiLLM connectivity
+    # Check OptiLLM service (direct integration)
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{settings.optillm_url}/health")
-            if response.status_code == 200:
-                health_status["services"]["optillm"] = {
-                    "status": "healthy",
-                    "message": "OptiLLM responding",
-                    "url": settings.optillm_url,
-                }
-            else:
-                health_status["services"]["optillm"] = {
-                    "status": "unhealthy",
-                    "message": f"OptiLLM returned status {response.status_code}",
-                    "url": settings.optillm_url,
-                }
-                health_status["overall_status"] = "degraded"
+        # OptiLLM is directly integrated, verify it's available
+        if optillm is not None:
+            technique_count = len(optillm.TECHNIQUES)
+            health_status["services"]["optillm"] = {
+                "status": "healthy",
+                "message": "OptiLLM direct integration active",
+                "integration": "direct",
+                "techniques_available": technique_count,
+            }
+        else:
+            health_status["services"]["optillm"] = {
+                "status": "unavailable",
+                "message": "OptiLLM service not initialized",
+                "integration": "direct",
+            }
+            health_status["overall_status"] = "degraded"
     except Exception as e:
         health_status["services"]["optillm"] = {
             "status": "unhealthy",
             "message": f"OptiLLM error: {str(e)}",
-            "url": settings.optillm_url,
+            "integration": "direct",
         }
         health_status["overall_status"] = "degraded"
 
