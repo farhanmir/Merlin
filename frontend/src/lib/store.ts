@@ -314,21 +314,41 @@ export const useChatStore = create<ChatState>()(
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           console.error('Failed to send message:', error);
           
-          toast.error('Failed to get response', {
-            description: errorMessage,
-            action: {
-              label: 'Retry',
-              onClick: () => get().sendMessage(content),
-            },
-          });
-          
-          set((state) => ({
-            messages: state.messages.map((msg) =>
-              msg.id === assistantMessage.id
-                ? { ...msg, content: `❌ Error: ${errorMessage}`, isError: true }
-                : msg
-            ),
-          }));
+          // Check for rate limit error (429)
+          if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
+            // Extract retry-after time if available
+            const retryMatch = errorMessage.match(/try again in (\d+) (second|minute|hour)s?/i);
+            const retryTime = retryMatch ? `${retryMatch[1]} ${retryMatch[2]}${parseInt(retryMatch[1]) > 1 ? 's' : ''}` : 'a few minutes';
+            
+            toast.error('Rate limit exceeded', {
+              description: `You've reached the limit of 50 messages per hour. Try again in ${retryTime}.`,
+              duration: 6000,
+            });
+            
+            set((state) => ({
+              messages: state.messages.map((msg) =>
+                msg.id === assistantMessage.id
+                  ? { ...msg, content: `⏱️ Rate limit exceeded. Please try again in ${retryTime}.`, isError: true }
+                  : msg
+              ),
+            }));
+          } else {
+            toast.error('Failed to get response', {
+              description: errorMessage,
+              action: {
+                label: 'Retry',
+                onClick: () => get().sendMessage(content),
+              },
+            });
+            
+            set((state) => ({
+              messages: state.messages.map((msg) =>
+                msg.id === assistantMessage.id
+                  ? { ...msg, content: `❌ Error: ${errorMessage}`, isError: true }
+                  : msg
+              ),
+            }));
+          }
         } finally {
           set({ isLoading: false });
         }

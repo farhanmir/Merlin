@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from merlin.api.health import router as health_router
 from merlin.api.v1.auth import router as auth_router
@@ -9,7 +9,10 @@ from merlin.api.v1.chat import router as chat_router
 from merlin.api.v1.keys import router as keys_router
 from merlin.api.v1.workflows import router as workflows_router
 from merlin.core.config import get_settings
+from merlin.core.rate_limit import limiter
 from merlin.db.session import init_db
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 
 @asynccontextmanager
@@ -35,6 +38,10 @@ app = FastAPI(
     description="Agentic AI Workbench with BYOK and OptiLLM integration",
     lifespan=lifespan,
 )
+
+# Add rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 settings = get_settings()

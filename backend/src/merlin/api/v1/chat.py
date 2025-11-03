@@ -1,7 +1,7 @@
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from merlin.api.deps import (
     ChatRepoDep,
     CurrentUserDep,
@@ -10,6 +10,7 @@ from merlin.api.deps import (
     SessionDep,
     SettingsDep,
 )
+from merlin.core.rate_limit import limiter
 from merlin.core.security import decrypt_api_key
 from merlin.schemas.chat import (
     ChatMessageResponse,
@@ -85,7 +86,9 @@ async def list_models(user_id: CurrentUserDep, key_repo: KeyRepoDep) -> ModelLis
 
 
 @router.post("/completions")
+@limiter.limit("50/hour")
 async def chat_completions(
+    request_obj: Request,
     request: ChatRequest,
     user_id: CurrentUserDep,
     key_repo: KeyRepoDep,
@@ -96,7 +99,11 @@ async def chat_completions(
     Send a chat completion request with optional streaming for the authenticated user.
 
     Supports OptiLLM techniques by prefixing the model name.
+    Rate limited to 50 requests per hour per user.
     """
+    # Set user_id in request state for rate limiting
+    request_obj.state.user_id = user_id
+
     # Strip OptiLLM technique prefixes to get the base model name
     # Techniques like "moa-", "plansearch-", etc. are prefixed to model names
     base_model = request.model
