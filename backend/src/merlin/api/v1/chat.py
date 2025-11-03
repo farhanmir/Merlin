@@ -112,8 +112,8 @@ async def list_models(user_id: CurrentUserDep, key_repo: KeyRepoDep) -> ModelLis
 @limiter.limit("30/hour")  # Aligned with Neon Free Tier (5 hours/day active time)
 async def chat_completions(
     request_obj: Request,
-    request: ChatRequest,
     user_id: CurrentUserDep,
+    request: ChatRequest,
     key_repo: KeyRepoDep,
     optillm_service: OptiLLMDep,
     settings: SettingsDep,
