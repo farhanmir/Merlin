@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useChatStore } from '@/lib/store';
 import { Technique } from '@/lib/types';
-import { ChevronDown, Sparkles, Zap } from 'lucide-react';
+import { ChevronDown, Sparkles, Zap, Clock } from 'lucide-react';
+import { estimateResponseTime, formatEstimatedTime } from '@/lib/estimation';
 
 const TECHNIQUES: Array<{
   id: Technique;
@@ -121,10 +122,18 @@ const TECHNIQUES: Array<{
 
 export function TechniquePanel() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { selectedTechniques, toggleTechnique } = useChatStore();
+  const { selectedTechniques, toggleTechnique, selectedModel } = useChatStore();
 
   // Group techniques by category
   const categories = Array.from(new Set(TECHNIQUES.map((t) => t.category)));
+  
+  // Calculate estimated time for selected techniques
+  const modelId = selectedModel || 'gpt-4o-mini';
+  const estimatedTime = selectedTechniques.length > 0
+    ? estimateResponseTime(modelId, 500, selectedTechniques)
+    : estimateResponseTime(modelId, 500, []);
+  
+  const formattedTime = formatEstimatedTime(estimatedTime);
 
   return (
     <div className="space-y-2">
@@ -142,9 +151,17 @@ export function TechniquePanel() {
         </div>
         <div className="flex items-center gap-2">
           {selectedTechniques.length > 0 && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300 rounded-full">
-              {selectedTechniques.length}
-            </span>
+            <>
+              <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300 rounded-full">
+                {selectedTechniques.length}
+              </span>
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 rounded-full">
+                <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                  ~{formattedTime}
+                </span>
+              </div>
+            </>
           )}
           <ChevronDown
             className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
@@ -156,10 +173,20 @@ export function TechniquePanel() {
 
       {isExpanded && (
         <div className="space-y-3 p-3 bg-white/50 dark:bg-gray-900/50 border border-gray-200/50 dark:border-gray-700/50 rounded-xl backdrop-blur-sm max-h-[32rem] overflow-y-auto">
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            Select OptiLLM techniques (may increase latency & cost)
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              Select OptiLLM techniques (may increase latency & cost)
+            </p>
+            {selectedTechniques.length > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                  Est. {formattedTime}
+                </span>
+              </div>
+            )}
+          </div>
 
           {categories.map((category) => {
             const categoryTechniques = TECHNIQUES.filter((t) => t.category === category);
