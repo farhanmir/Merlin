@@ -87,8 +87,9 @@ Go to https://dashboard.render.com → Your Merlin backend service → Environme
 # Database (CRITICAL - update this!)
 DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE
 
-# JWT Secret (CRITICAL - use the generated one below!)
-JWT_SECRET_KEY=a77271822bec91e9f2b99b07cc4a3ee63ad359d2f465f9c427224904796abf0c
+# JWT Secret (generate your own!)
+# Run: python -c "import secrets; print(secrets.token_hex(32))"
+JWT_SECRET_KEY=your-jwt-secret-here
 
 # Keep these the same:
 FERNET_KEY=<your-existing-fernet-key-from-render>
@@ -198,15 +199,16 @@ After successful deployment:
 
 ---
 
-## Generated Secrets (COPY THESE!)
+## Generated Secrets (DO NOT COMMIT!)
+
+Generate your own secrets locally:
 
 ```bash
-# JWT Secret Key (64 characters)
-JWT_SECRET_KEY=a77271822bec91e9f2b99b07cc4a3ee63ad359d2f465f9c427224904796abf0c
+# Generate JWT Secret (64 characters)
+python -c "import secrets; print(secrets.token_hex(32))"
 
-# Fernet Key (keep existing or generate new)
-# To generate new: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-FERNET_KEY=<use-your-existing-key-from-render-or-generate-new>
+# Generate Fernet Key (44 characters)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-**⚠️ IMPORTANT:** Never commit these to Git! They're for Render environment variables only.
+**⚠️ NEVER commit secrets to Git! Add them directly to Render/Vercel environment variables.**
