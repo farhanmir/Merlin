@@ -40,6 +40,7 @@ from merlin.api.v1.keys import router as keys_router
 from merlin.api.v1.workflows import router as workflows_router
 from merlin.core.config import get_settings
 from merlin.core.rate_limit import limiter
+from merlin.core.security import decode_access_token
 from merlin.db.session import init_db
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -82,6 +83,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Middleware to set request.state.user_id from JWT token for rate limiting
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Extract user_id from JWT token and set on request.state for rate limiting."""
+    # Set default user_id to None
+    request.state.user_id = None
+
+    # Try to extract user_id from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]  # Remove "Bearer " prefix
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            request.state.user_id = payload["sub"]
+
+    response = await call_next(request)
+    return response
+
 
 # Include routers
 app.include_router(health_router, tags=["health"])

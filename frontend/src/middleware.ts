@@ -1,5 +1,10 @@
 export { auth as middleware } from '@/auth';
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  // Only protect authenticated app routes, allow landing page and public routes
+  matcher: [
+    '/chat/:path*',
+    '/(settings)/:path*',
+    '/(workflows)/:path*',
+  ],
 };

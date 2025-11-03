@@ -23,12 +23,12 @@ services:
     envVars:
       - key: FERNET_KEY
         sync: false  # Set manually in Render dashboard
+      - key: JWT_SECRET_KEY
+        sync: false  # Set manually in Render dashboard (min 32 chars)
       - key: DATABASE_URL
-        sync: false  # Set manually (from Neon)
-      - key: OPTILLM_URL
-        sync: false  # Set manually (from Replit)
+        sync: false  # Set manually (from Neon or managed Postgres)
       - key: CORS_ORIGINS
-        value: "*"  # Update with your Vercel URL after frontend deployment
+        value: "https://your-frontend.vercel.app"  # MUST update with your actual Vercel deployment URL (JSON array format: ["https://app.example.com","https://www.example.com"] for multiple origins)
       - key: PYTHON_VERSION
         value: "3.11"
     healthCheckPath: /health

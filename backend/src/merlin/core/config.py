@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # Security
     fernet_key: str
+    jwt_secret_key: str
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./merlin.db"
@@ -38,6 +39,18 @@ class Settings(BaseSettings):
         if len(v) != 44:
             raise ValueError(
                 "FERNET_KEY must be exactly 44 characters (base64-encoded 32 bytes)"
+            )
+        return v
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str) -> str:
+        """Validate that the JWT secret key is non-empty and sufficiently long."""
+        if not v:
+            raise ValueError("JWT_SECRET_KEY is required")
+        if len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be at least 32 characters for security"
             )
         return v
 

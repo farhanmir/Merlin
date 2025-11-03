@@ -39,85 +39,78 @@ const MODEL_SPEEDS: Record<string, number> = {
 // Technique overhead characteristics
 // multiplier: how many times the base response (e.g., 3x means 3 LLM calls)
 // fixedMs: additional processing/parsing time in milliseconds
+// apiCalls: estimated number of API calls this technique makes
 interface TechniqueOverhead {
   multiplier: number;
   fixedMs: number;
+  apiCalls: number;
   description: string;
 }
 
-const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
+export const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
   // Planning (medium-high overhead)
-  'plansearch': {
+  plansearch: {
     multiplier: 4, // Multiple plan candidates
     fixedMs: 1500,
-    description: '4 candidate plans evaluated',
+    apiCalls: 8,
+    description: '8 API calls: observations + solution + implementation',
   },
-  
-  // Core Reasoning (medium-high overhead)
-  'cot_reflection': {
+
+  // Core Reasoning (low-medium overhead)
+  cot_reflection: {
     multiplier: 3, // Think + Reflect + Answer
     fixedMs: 1000,
-    description: '3-stage reasoning process',
+    apiCalls: 2,
+    description: '2 API calls: initial + reflection',
   },
-  'moa': {
+  moa: {
     multiplier: 4, // Multiple agents + aggregation
     fixedMs: 2000,
-    description: '4 agents + synthesis',
+    apiCalls: 7,
+    description: '7 API calls: 3 initial + 3 critiques + synthesis',
   },
-  
+
   // Sampling & Verification (medium overhead)
-  'bon': {
+  bon: {
     multiplier: 3, // Best of N (default N=3)
     fixedMs: 500,
-    description: 'Generate 3, pick best',
+    apiCalls: 6,
+    description: '6 API calls: 3 generations + 3 ratings',
   },
-  'self_consistency': {
+  self_consistency: {
     multiplier: 5, // Multiple reasoning paths
     fixedMs: 1000,
-    description: '5 reasoning paths',
+    apiCalls: 3,
+    description: '3 API calls: sample paths (reduced from 5 for free tier)',
   },
-  // NOTE: PVG disabled - exceeds free tier rate limits (20+ API calls)
-  // 'pvg': {
-  //   multiplier: 3, // Generate + Verify + Refine
-  //   fixedMs: 800,
-  //   description: 'Generate + Verify + Refine',
-  // },
-  
+
   // Search & Optimization (high overhead)
-  'mcts': {
+  mcts: {
     multiplier: 6, // Tree search with simulations
     fixedMs: 2500,
-    description: '6 tree search simulations',
+    apiCalls: 15,
+    description: '15 API calls: tree search with simulations',
   },
-  'rstar': {
+  rstar: {
     multiplier: 5, // Rollout simulations
     fixedMs: 2000,
-    description: '5 rollout simulations',
+    apiCalls: 12,
+    description: '12 API calls: rollout simulations',
   },
-  'rto': {
+  rto: {
     multiplier: 4, // Round-trip optimization
     fixedMs: 1200,
-    description: 'Multi-round optimization',
+    apiCalls: 4,
+    description: '4 API calls: forward + backward passes',
   },
-  
-  // Specialized Techniques (low-medium overhead)
-  'leap': {
-    multiplier: 2, // Learning-enhanced planning
-    fixedMs: 800,
-    description: 'Enhanced planning pass',
+
+  // Specialized (low-medium overhead)
+  leap: {
+    multiplier: 3, // Extract + Generate + Apply
+    fixedMs: 1000,
+    apiCalls: 4,
+    description: '4 API calls: examples + mistakes + principles + apply',
   },
-  // NOTE: RE2 disabled - exceeds free tier rate limits (15+ API calls)
-  // 're2': {
-  //   multiplier: 2, // Re-reading
-  //   fixedMs: 400,
-  //   description: 'Read twice strategy',
-  // },
-  // NOTE: Z3 disabled - not integrated in OptiLLMService
-  // 'z3': {
-  //   multiplier: 1.5, // SMT solver integration
-  //   fixedMs: 1500,
-  //   description: 'Logical constraint solving',
-  // },
 };
 
 /**
@@ -268,4 +261,158 @@ export function estimateOutputTokens(inputText: string): number {
   
   // For long inputs, expect proportional output
   return inputTokens * 1.2;
+}
+
+/**
+ * Calculate total API calls for selected techniques
+ *
+ * @param techniques - List of selected techniques
+ * @returns Total estimated API calls
+ */
+export function calculateTotalApiCalls(techniques: Technique[]): number {
+  if (techniques.length === 0) {
+    return 1; // Base call without techniques
+  }
+
+  return techniques.reduce(
+    (sum, t) => sum + (TECHNIQUE_OVERHEAD[t]?.apiCalls || 1),
+    0
+  );
+}
+
+/**
+ * Check if technique combination will likely hit rate limits
+ *
+ * @param techniques - List of selected techniques
+ * @param provider - Provider being used (affects rate limits)
+ * @returns Object with isValid flag and warning message if applicable
+ */
+export function validateTechniqueCombination(
+  techniques: Technique[],
+  provider?: string
+): {
+  isValid: boolean;
+  warning?: string;
+  totalCalls: number;
+  limit: number;
+} {
+  const totalCalls = calculateTotalApiCalls(techniques);
+
+  // Provider rate limits (requests per minute)
+  const rateLimits: Record<string, number> = {
+    google: 15,
+    openai: 3, // Free tier
+    anthropic: 50,
+    groq: 30,
+    fireworks: 60,
+    together: 60,
+    cerebras: 30,
+    xai: 20,
+    perplexity: 20,
+    replicate: 50,
+    cohere: 20,
+    mistral: 20,
+  };
+
+  const limit = provider ? rateLimits[provider] || 60 : 60;
+
+  // Warn if total calls exceed 80% of rate limit
+  const threshold = Math.floor(limit * 0.8);
+
+  if (totalCalls > limit) {
+    return {
+      isValid: false,
+      warning: `This combination will exceed your rate limit (${totalCalls} calls > ${limit}/min for ${provider || 'this provider'}). You'll encounter errors.`,
+      totalCalls,
+      limit,
+    };
+  }
+
+  if (totalCalls > threshold) {
+    return {
+      isValid: true,
+      warning: `This combination uses ${totalCalls} API calls, close to your ${limit}/min limit. Consider using fewer techniques.`,
+      totalCalls,
+      limit,
+    };
+  }
+
+  return {
+    isValid: true,
+    totalCalls,
+    limit,
+  };
+}
+
+/**
+ * Get technique categories for grouping
+ */
+export function getTechniqueCategory(technique: Technique): string {
+  const overhead = TECHNIQUE_OVERHEAD[technique];
+  if (!overhead) return 'Other';
+
+  if (overhead.apiCalls >= 10) return 'Heavy';
+  if (overhead.apiCalls >= 5) return 'Medium';
+  return 'Light';
+}
+
+/**
+ * Get recommended technique combinations for a provider
+ *
+ * @param provider - Provider name
+ * @returns Recommended combinations with descriptions
+ */
+export function getRecommendedCombinations(provider?: string): Array<{
+  name: string;
+  techniques: Technique[];
+  apiCalls: number;
+  description: string;
+}> {
+  // Determine rate limit based on provider
+  let limit = 60; // Default high limit
+  if (provider === 'google') {
+    limit = 15;
+  } else if (provider === 'openai') {
+    limit = 3;
+  }
+
+  const combinations = [
+    {
+      name: 'Quick Enhancement',
+      techniques: ['cot_reflection' as Technique],
+      apiCalls: 2,
+      description: 'Fast improvement with chain-of-thought reasoning',
+    },
+    {
+      name: 'Balanced Quality',
+      techniques: ['plansearch' as Technique, 'cot_reflection' as Technique],
+      apiCalls: 10,
+      description: 'Good balance of planning and reasoning',
+    },
+    {
+      name: 'Multi-Agent',
+      techniques: ['moa' as Technique, 'bon' as Technique],
+      apiCalls: 13,
+      description: 'Multiple perspectives with best-of-n selection',
+    },
+    {
+      name: 'Deep Search',
+      techniques: ['mcts' as Technique],
+      apiCalls: 15,
+      description: 'Advanced tree search for complex problems',
+    },
+    {
+      name: 'Maximum Quality',
+      techniques: [
+        'plansearch' as Technique,
+        'cot_reflection' as Technique,
+        'self_consistency' as Technique,
+      ],
+      apiCalls: 13,
+      description: 'Comprehensive reasoning with consistency checking',
+    },
+  ];
+
+  // Filter by rate limit
+  return combinations.filter((c) => c.apiCalls <= limit);
 }

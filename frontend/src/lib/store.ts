@@ -496,8 +496,27 @@ export const useChatStore = create<ChatState>()(
       },
 
       deleteSession: (sessionId: string) => {
-        const { sessions } = get();
+        const { sessions, currentSessionId } = get();
+        
+        // Call backend API to delete session
+        import('./api').then(({ deleteSession: apiDeleteSession }) => {
+          apiDeleteSession(sessionId).catch((error) => {
+            console.error('Failed to delete session from backend:', error);
+            toast.error('Failed to delete chat from server');
+          });
+        });
+        
+        // Update local state
         set({ sessions: sessions.filter(s => s.id !== sessionId) });
+        
+        // If deleting the current session, reset to new chat
+        if (currentSessionId === sessionId) {
+          set({
+            currentSessionId: null,
+            messages: [],
+          });
+        }
+        
         toast.success('Chat deleted');
       },
 
