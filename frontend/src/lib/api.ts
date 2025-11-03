@@ -60,7 +60,7 @@ export async function sendChatMessage(
   model: string,
   messages: Message[],
   techniques: Technique[]
-): Promise<ReadableStream<Uint8Array>> {
+): Promise<ReadableStream<Uint8Array> | any> {
   const response = await fetch(`${API_BASE_URL}/api/v1/chat/completions`, {
     method: 'POST',
     headers: {
@@ -92,11 +92,19 @@ export async function sendChatMessage(
     throw new Error(errorMessage);
   }
 
-  if (!response.body) {
-    throw new Error('Response body is null');
+  // Check if response is streaming (SSE) or regular JSON
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('text/event-stream')) {
+    // Streaming response
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+    return response.body;
+  } else {
+    // Non-streaming JSON response (Google/Anthropic)
+    const data = await response.json();
+    return data;
   }
-
-  return response.body;
 }
 
 // Health

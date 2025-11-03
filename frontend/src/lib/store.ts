@@ -109,45 +109,48 @@ export const useChatStore = create<ChatState>()(
         set({ messages: [...get().messages, assistantMessage] });
 
         try {
-          const stream = await sendChatMessage(
+          const response = await sendChatMessage(
             selectedModel,
             [...messages, userMessage],
             selectedTechniques
           );
 
-          const reader = stream.getReader();
-          const decoder = new TextDecoder();
-          let buffer = ''; // Buffer for incomplete SSE lines
+          // Check if response is streaming or plain JSON
+          if (response instanceof ReadableStream) {
+            // Handle streaming response (OpenAI)
+            const reader = response.getReader();
+            const decoder = new TextDecoder();
+            let buffer = ''; // Buffer for incomplete SSE lines
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              // Calculate final metrics when stream completes
-              const endTime = new Date();
-              const latencyMs = endTime.getTime() - startTime.getTime();
-              
-              set((state) => ({
-                messages: state.messages.map((msg) =>
-                  msg.id === assistantMessage.id
-                    ? { 
-                        ...msg, 
-                        endTime,
-                        latencyMs,
-                        tokenCount: Math.ceil(msg.content.length * 0.25), // Rough estimate
-                      }
-                    : msg
-                ),
-              }));
-              break;
-            }
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                // Calculate final metrics when stream completes
+                const endTime = new Date();
+                const latencyMs = endTime.getTime() - startTime.getTime();
+                
+                set((state) => ({
+                  messages: state.messages.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? { 
+                          ...msg, 
+                          endTime,
+                          latencyMs,
+                          tokenCount: Math.ceil(msg.content.length * 0.25), // Rough estimate
+                        }
+                      : msg
+                  ),
+                }));
+                break;
+              }
 
-            const chunk = decoder.decode(value, { stream: true });
-            buffer += chunk;
+              const chunk = decoder.decode(value, { stream: true });
+              buffer += chunk;
 
-            // Split on \n\n to get complete SSE messages
-            const parts = buffer.split('\n\n');
-            // Keep the last (potentially incomplete) part in the buffer
-            buffer = parts.pop() || '';
+              // Split on \n\n to get complete SSE messages
+              const parts = buffer.split('\n\n');
+              // Keep the last (potentially incomplete) part in the buffer
+              buffer = parts.pop() || '';
 
             for (const part of parts) {
               const lines = part.split('\n');
@@ -176,6 +179,26 @@ export const useChatStore = create<ChatState>()(
               }
             }
           }
+        } else {
+          // Handle non-streaming JSON response (Google/Anthropic)
+          const content = response.choices?.[0]?.message?.content || '';
+          const endTime = new Date();
+          const latencyMs = endTime.getTime() - startTime.getTime();
+
+          set((state) => ({
+            messages: state.messages.map((msg) =>
+              msg.id === assistantMessage.id
+                ? { 
+                    ...msg, 
+                    content,
+                    endTime,
+                    latencyMs,
+                    tokenCount: Math.ceil(content.length * 0.25),
+                  }
+                : msg
+            ),
+          }));
+        }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           console.error('Failed to send message:', error);
