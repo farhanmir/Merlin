@@ -1,0 +1,25 @@
+# Render Blueprint for Merlin Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: merlin-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: uvicorn merlin.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FERNET_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: DATABASE_URL
+        sync: false  # Set manually (from Neon)
+      - key: OPTILLM_URL
+        sync: false  # Set manually (from Replit)
+      - key: CORS_ORIGINS
+        value: "*"  # Update with your Vercel URL after frontend deployment
+      - key: PYTHON_VERSION
+        value: "3.11"
+    healthCheckPath: /health
