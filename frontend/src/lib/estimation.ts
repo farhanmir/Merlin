@@ -86,11 +86,12 @@ const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
     fixedMs: 1000,
     description: '5 reasoning paths',
   },
-  'pvg': {
-    multiplier: 3, // Generate + Verify + Refine
-    fixedMs: 800,
-    description: 'Generate + Verify + Refine',
-  },
+  // NOTE: PVG disabled - exceeds free tier rate limits (20+ API calls)
+  // 'pvg': {
+  //   multiplier: 3, // Generate + Verify + Refine
+  //   fixedMs: 800,
+  //   description: 'Generate + Verify + Refine',
+  // },
   
   // Search & Optimization (high overhead)
   'mcts': {
@@ -115,11 +116,12 @@ const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
     fixedMs: 800,
     description: 'Enhanced planning pass',
   },
-  're2': {
-    multiplier: 2, // Re-reading
-    fixedMs: 400,
-    description: 'Read twice strategy',
-  },
+  // NOTE: RE2 disabled - exceeds free tier rate limits (15+ API calls)
+  // 're2': {
+  //   multiplier: 2, // Re-reading
+  //   fixedMs: 400,
+  //   description: 'Read twice strategy',
+  // },
   'z3': {
     multiplier: 1.5, // SMT solver integration
     fixedMs: 1500,

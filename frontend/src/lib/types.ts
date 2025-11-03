@@ -43,8 +43,8 @@ export interface ApiKey {
 
 export type Technique =
   // Advanced Multi-Agent & Planning
-  | 'mars'
-  | 'cepo'
+  | 'mars'      // Disabled - missing dependencies
+  | 'cepo'      // Disabled - missing dependencies
   | 'plansearch'
   // Core Reasoning
   | 'cot_reflection'
@@ -52,14 +52,14 @@ export type Technique =
   // Sampling & Verification
   | 'bon'
   | 'self_consistency'
-  | 'pvg'
+  // | 'pvg'    // Disabled - exceeds free tier rate limits
   // Search & Optimization
   | 'mcts'
   | 'rstar'
   | 'rto'
   // Specialized Techniques
   | 'leap'
-  | 're2'
+  // | 're2'   // Disabled - exceeds free tier rate limits
   | 'z3';
 
 export interface ChatRequest {

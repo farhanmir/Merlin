@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function ServerStatus() {
   const [status, setStatus] = useState<'checking' | 'healthy' | 'error'>('checking');
   const [attempt, setAttempt] = useState(0);
+  const [healthDetails, setHealthDetails] = useState<{
+    basic: boolean;
+    database: boolean;
+  }>({ basic: false, database: false });
   const maxAttempts = 60; // 60 seconds total (Render cold start can take 30-60s)
 
   useEffect(() => {
@@ -18,19 +22,56 @@ export function ServerStatus() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout per request
 
-        const response = await fetch(`${apiUrl}/health`, {
+        // First check basic health
+        const basicResponse = await fetch(`${apiUrl}/health`, {
           signal: controller.signal,
           cache: 'no-store',
         });
 
         clearTimeout(timeoutId);
 
-        if (response.ok && isMounted) {
-          setStatus('healthy');
-          return true;
+        if (!basicResponse.ok) {
+          throw new Error('Basic health check failed');
+        }
+
+        // Update basic health status
+        if (isMounted) {
+          setHealthDetails(prev => ({ ...prev, basic: true }));
+        }
+
+        // Then check detailed health (includes database)
+        const detailedController = new AbortController();
+        const detailedTimeoutId = setTimeout(() => detailedController.abort(), 5000);
+
+        const detailedResponse = await fetch(`${apiUrl}/health/detailed`, {
+          signal: detailedController.signal,
+          cache: 'no-store',
+        });
+
+        clearTimeout(detailedTimeoutId);
+
+        if (detailedResponse.ok) {
+          const data = await detailedResponse.json();
+          
+          // Check if database is healthy
+          const dbHealthy = data.database?.status === 'healthy';
+          const overallHealthy = data.overall_status === 'healthy';
+          
+          if (isMounted) {
+            setHealthDetails({ basic: true, database: dbHealthy });
+            
+            // Only mark as fully healthy if both basic and database are healthy
+            if (overallHealthy && dbHealthy) {
+              setStatus('healthy');
+              return true;
+            }
+          }
         }
       } catch (error) {
         console.log('Health check failed, retrying...', error);
+        if (isMounted) {
+          setHealthDetails({ basic: false, database: false });
+        }
       }
 
       if (isMounted) {
@@ -83,10 +124,35 @@ export function ServerStatus() {
                   <h2 className="text-xl font-semibold text-white mb-2">
                     Waking up servers...
                   </h2>
-                  <p className="text-slate-400 text-sm">
+                  <p className="text-slate-400 text-sm mb-4">
                     Render Free Tier cold start may take 30-60 seconds
                   </p>
-                  <div className="mt-4 flex items-center justify-center gap-2">
+                  
+                  {/* Health checklist */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-center gap-2 text-sm">
+                      {healthDetails.basic ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                      )}
+                      <span className={healthDetails.basic ? 'text-green-400' : 'text-slate-400'}>
+                        Backend server
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm">
+                      {healthDetails.database ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                      )}
+                      <span className={healthDetails.database ? 'text-green-400' : 'text-slate-400'}>
+                        Database connection
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-center gap-2">
                     <div className="h-1.5 w-32 bg-slate-700 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"

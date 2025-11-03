@@ -65,13 +65,14 @@ const TECHNIQUES: Array<{
     icon: '🎲',
     category: 'Sampling',
   },
-  {
-    id: 'pvg',
-    name: 'Prover-Verifier Game',
-    description: 'Adversarial prover-verifier approach',
-    icon: '⚔️',
-    category: 'Verification',
-  },
+  // NOTE: PVG disabled - exceeds free tier rate limits (20+ API calls)
+  // {
+  //   id: 'pvg',
+  //   name: 'Prover-Verifier Game',
+  //   description: 'Adversarial prover-verifier approach',
+  //   icon: '⚔️',
+  //   category: 'Verification',
+  // },
   
   // Advanced Search & Optimization
   {
@@ -104,13 +105,14 @@ const TECHNIQUES: Array<{
     icon: '🦘',
     category: 'Learning',
   },
-  {
-    id: 're2',
-    name: 'ReRead',
-    description: 'Process queries twice to improve reasoning',
-    icon: '📖',
-    category: 'Processing',
-  },
+  // NOTE: RE2 disabled - exceeds free tier rate limits (15+ API calls)
+  // {
+  //   id: 're2',
+  //   name: 'ReRead',
+  //   description: 'Process queries twice to improve reasoning',
+  //   icon: '📖',
+  //   category: 'Processing',
+  // },
   {
     id: 'z3',
     name: 'Z3 Solver',
@@ -128,10 +130,12 @@ export function TechniquePanel() {
   const categories = Array.from(new Set(TECHNIQUES.map((t) => t.category)));
   
   // Calculate estimated time for selected techniques
+  // Use 400 tokens as average (most responses are 300-600 tokens)
   const modelId = selectedModel || 'gpt-4o-mini';
+  const avgTokens = 400;
   const estimatedTime = selectedTechniques.length > 0
-    ? estimateResponseTime(modelId, 500, selectedTechniques)
-    : estimateResponseTime(modelId, 500, []);
+    ? estimateResponseTime(modelId, avgTokens, selectedTechniques)
+    : estimateResponseTime(modelId, avgTokens, []);
   
   const formattedTime = formatEstimatedTime(estimatedTime);
 

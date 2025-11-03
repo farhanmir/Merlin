@@ -8,8 +8,14 @@ from typing import Any, Callable
 
 from fastapi import HTTPException
 from merlin.optillm.bon import best_of_n_sampling
+
+# NOTE: CePO disabled - requires math_verify and conversation_logger dependencies
+# from merlin.optillm.cepo.cepo import cepo, init_cepo_config
 from merlin.optillm.cot_reflection import cot_reflection
 from merlin.optillm.leap import leap
+
+# NOTE: MARS disabled - requires optillm module import (circular dependency)
+# from merlin.optillm.mars import multi_agent_reasoning_system
 from merlin.optillm.mcts import chat_with_mcts
 
 # Import OptiLLM approach modules
@@ -123,17 +129,24 @@ class OptiLLMService:
     """
 
     # Map technique names to their functions
+    # NOTE: Some techniques disabled due to missing dependencies or rate limit constraints
     TECHNIQUES = {
-        "moa": mixture_of_agents,
-        "cot_reflection": cot_reflection,
-        "plansearch": plansearch,
-        "bon": best_of_n_sampling,
-        "self_consistency": advanced_self_consistency_approach,
-        "pvg": inference_time_pv_game,
-        "mcts": chat_with_mcts,
-        "leap": leap,
-        "re2": re2_approach,
-        "rto": round_trip_optimization,
+        # === DISABLED - Missing Dependencies ===
+        # "mars": multi_agent_reasoning_system,  # Requires optillm module import
+        # "cepo": cepo,  # Requires math_verify and conversation_logger
+        # === ENABLED - Light API Usage (1-5 calls) ===
+        "moa": mixture_of_agents,  # ~3-5 API calls
+        "cot_reflection": cot_reflection,  # ~2 API calls
+        "plansearch": plansearch,  # ~8 API calls (returns code blocks)
+        "bon": best_of_n_sampling,  # ~3 API calls
+        "self_consistency": advanced_self_consistency_approach,  # ~5 API calls
+        "leap": leap,  # ~2 API calls
+        "rto": round_trip_optimization,  # ~4 API calls
+        # === ENABLED - Heavy API Usage (10-20+ calls) ===
+        "mcts": chat_with_mcts,  # ~10-15 API calls (Monte Carlo tree search)
+        # === DISABLED - Exceeds Free Tier Rate Limits (15 RPM) ===
+        # "pvg": inference_time_pv_game,  # ~20+ API calls (2 rounds × 6 solutions + verification)
+        # "re2": re2_approach,  # ~15+ API calls (multiple reasoning steps)
     }
 
     def __init__(self) -> None:
@@ -192,6 +205,67 @@ class OptiLLMService:
                 initial_query = msg["content"]
 
         return system_prompt, initial_query
+
+    def _clean_response_for_chaining(self, response: str, provider: str) -> str:
+        """
+        Clean technique response before passing to next technique.
+
+        Some techniques (like plansearch) return code blocks or structured outputs
+        that cause issues when passed to subsequent techniques, especially with
+        Google's Gemini API which rejects non-struct values.
+
+        Args:
+            response: Raw response from previous technique
+            provider: LLM provider (some are more strict about formats)
+
+        Returns:
+            Cleaned response suitable for next technique
+        """
+        import re
+
+        # If response contains code blocks, extract just the conceptual answer
+        # Code blocks cause "Value is not a struct" errors with Google Gemini
+        if "```" in response:
+            # Try to find explanatory text before code blocks
+            parts = response.split("```")
+            if len(parts) > 1:
+                # Get text before first code block
+                before_code = parts[0].strip()
+                if before_code and len(before_code) > 50:
+                    # If there's substantial text before code, use that
+                    return before_code
+
+                # Otherwise, try to extract the answer from within code comments
+                # or look for text between code blocks
+                for i in range(1, len(parts), 2):
+                    if i + 1 < len(parts):
+                        between_blocks = parts[i + 1].strip()
+                        if between_blocks and len(between_blocks) > 30:
+                            return between_blocks
+
+            # Last resort: try to extract answer from code comments
+            code_match = re.search(r"```(?:python)?\n(.*?)```", response, re.DOTALL)
+            if code_match:
+                code_content = code_match.group(1)
+                # Look for docstrings or comments explaining the answer
+                docstring_match = re.search(r'"""(.*?)"""', code_content, re.DOTALL)
+                if docstring_match:
+                    return docstring_match.group(1).strip()
+
+                # Look for the actual answer in the code (e.g., word = "heroine")
+                answer_match = re.search(
+                    r'(?:word|answer|result)\s*=\s*["\']([^"\']+)["\']', code_content
+                )
+                if answer_match:
+                    answer = answer_match.group(1)
+                    return f"The answer is: {answer}"
+
+        # If no code blocks or couldn't extract, return as-is
+        # but limit length to avoid token issues
+        if len(response) > 2000:
+            return response[:2000] + "..."
+
+        return response
 
     async def apply_techniques(
         self,
@@ -274,7 +348,13 @@ class OptiLLMService:
                         client,
                         model,
                     )
-                    final_response = response
+
+                    # Clean response before passing to next technique
+                    # This prevents code blocks from causing API errors in subsequent techniques
+                    final_response = self._clean_response_for_chaining(
+                        response, provider
+                    )
+
                     logger.info(f"✓ {technique} completed successfully")
                     break  # Success, exit retry loop
 
@@ -338,10 +418,6 @@ class OptiLLMService:
                 system_prompt, query, client, model, self.config["best_of_n"]
             )
         elif technique == "plansearch":
-            return technique_func(
-                system_prompt, query, client, model, n=self.config["n"]
-            )
-        elif technique == "re2":
             return technique_func(
                 system_prompt, query, client, model, n=self.config["n"]
             )

@@ -12,7 +12,7 @@ export function ChatInput() {
   
   // Calculate estimated response time based on input
   const modelId = selectedModel || 'gpt-4o-mini';
-  const estimatedTokens = input.length > 0 ? estimateOutputTokens(input) : 500;
+  const estimatedTokens = input.length > 0 ? estimateOutputTokens(input) : 400;
   const estimatedTime = estimateResponseTime(modelId, estimatedTokens, selectedTechniques);
   const formattedTime = formatEstimatedTime(estimatedTime);
 
@@ -71,10 +71,11 @@ export function ChatInput() {
             
             {/* Estimated time indicator */}
             {input.length > 0 && (
-              <div className="absolute bottom-2 left-4 flex items-center gap-3">
-                <div className="text-xs text-gray-400">
+              <div className="absolute bottom-2 left-4 flex items-center gap-4">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
                   {input.length} chars
                 </div>
+                <div className="h-3 w-px bg-gray-300 dark:bg-gray-600" />
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded-md">
                   <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                   <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
