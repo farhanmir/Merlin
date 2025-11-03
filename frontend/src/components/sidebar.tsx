@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Sparkles, Moon, Sun, LucideIcon } from 'lucide-react';
 import { useTheme } from '@/lib/theme-provider';
+import { SignOutButton } from '@/components/sign-out-button';
 
 interface NavigationItem {
   label: string;
@@ -76,8 +77,8 @@ export function Sidebar({ navigationItems, children }: Readonly<SidebarProps>) {
         </div>
       )}
 
-      {/* Theme Toggle */}
-      <div className="flex-shrink-0 px-3 pb-4 border-t border-gray-200 dark:border-gray-800 pt-3">
+      {/* Theme Toggle and Sign Out */}
+      <div className="flex-shrink-0 px-3 pb-4 border-t border-gray-200 dark:border-gray-800 pt-3 space-y-1">
         <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-150"
@@ -94,6 +95,8 @@ export function Sidebar({ navigationItems, children }: Readonly<SidebarProps>) {
             {resolvedTheme === 'dark' ? 'Light' : 'Dark'} Mode
           </span>
         </button>
+        
+        <SignOutButton />
       </div>
     </aside>
   );

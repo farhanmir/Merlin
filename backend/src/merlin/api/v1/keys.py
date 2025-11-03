@@ -1,8 +1,7 @@
 import httpx
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
-
-from merlin.api.deps import KeyRepoDep, SettingsDep
+from merlin.api.deps import CurrentUserDep, KeyRepoDep, SettingsDep
 from merlin.core.security import decrypt_api_key, encrypt_api_key
 from merlin.schemas.keys import ApiKeyCreate, ApiKeyList, ApiKeyResponse
 
@@ -19,14 +18,14 @@ VALIDATION_ENDPOINTS = {
 async def validate_api_key(provider: str, api_key: str) -> bool:
     """
     Validate an API key by making a test request to the provider's API.
-    
+
     Returns True if valid, False otherwise.
     """
     if provider not in VALIDATION_ENDPOINTS:
         return False
-    
+
     url, header_key, prefix = VALIDATION_ENDPOINTS[provider]
-    
+
     if provider == "google":
         # Google uses query parameter
         url = f"{url}?key={api_key}"
@@ -35,7 +34,7 @@ async def validate_api_key(provider: str, api_key: str) -> bool:
         # OpenAI and Anthropic use headers
         auth_value = f"{prefix} {api_key}".strip()
         headers = {header_key: auth_value}
-    
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             response = await client.get(url, headers=headers)
@@ -45,12 +44,14 @@ async def validate_api_key(provider: str, api_key: str) -> bool:
 
 
 @router.get("", response_model=ApiKeyList)
-async def list_api_keys(key_repo: KeyRepoDep, settings: SettingsDep) -> ApiKeyList:
+async def list_api_keys(
+    user_id: CurrentUserDep, key_repo: KeyRepoDep, settings: SettingsDep
+) -> ApiKeyList:
     """
-    List all configured API keys (with masked values).
+    List all configured API keys for the authenticated user (with masked values).
     """
-    keys = await key_repo.get_all()
-    
+    keys = await key_repo.get_all(user_id)
+
     api_keys = []
     for key in keys:
         # Decrypt the key to create a meaningful mask from plaintext
@@ -64,7 +65,7 @@ async def list_api_keys(key_repo: KeyRepoDep, settings: SettingsDep) -> ApiKeyLi
         except Exception:
             # If decryption fails, use a generic mask
             masked = "***...***"
-        
+
         api_keys.append(
             ApiKeyResponse(
                 provider=key.provider,
@@ -74,40 +75,42 @@ async def list_api_keys(key_repo: KeyRepoDep, settings: SettingsDep) -> ApiKeyLi
                 updated_at=key.updated_at,
             )
         )
-    
+
     return ApiKeyList(keys=api_keys)
 
 
 @router.post("", response_model=ApiKeyResponse)
 async def add_api_key(
     request: ApiKeyCreate,
+    user_id: CurrentUserDep,
     key_repo: KeyRepoDep,
     settings: SettingsDep,
 ) -> ApiKeyResponse:
     """
-    Add or update an API key.
-    
+    Add or update an API key for the authenticated user.
+
     The key will be validated before storage.
     """
     # Validate the API key
     is_valid = await validate_api_key(request.provider, request.api_key)
-    
+
     if not is_valid:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid API key for provider: {request.provider}",
         )
-    
+
     # Encrypt the API key
     encrypted_key = encrypt_api_key(request.api_key, settings.fernet_key)
-    
+
     # Store in database
     api_key_record = await key_repo.upsert(
+        user_id=user_id,
         provider=request.provider,
         encrypted_key=encrypted_key,
         is_valid=is_valid,
     )
-    
+
     # Create meaningful mask from plaintext
     if len(request.api_key) > 7:
         masked = f"{request.api_key[:3]}...{request.api_key[-4:]}"
@@ -124,13 +127,17 @@ async def add_api_key(
 
 
 @router.delete("/{provider}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_api_key(provider: str, key_repo: KeyRepoDep) -> Response:
+async def delete_api_key(
+    provider: str, user_id: CurrentUserDep, key_repo: KeyRepoDep
+) -> Response:
     """
-    Delete an API key for a specific provider.
+    Delete an API key for a specific provider for the authenticated user.
     """
-    deleted = await key_repo.delete(provider)
-    
+    deleted = await key_repo.delete(user_id, provider)
+
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"No API key found for provider: {provider}")
-    
+        raise HTTPException(
+            status_code=404, detail=f"No API key found for provider: {provider}"
+        )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)

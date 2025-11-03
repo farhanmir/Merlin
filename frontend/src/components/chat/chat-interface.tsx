@@ -9,12 +9,17 @@ import { useChatStore } from '@/lib/store';
 import { Loader2 } from 'lucide-react';
 
 export function ChatInterface() {
-  const { messages, selectedModel, selectedTechniques, isLoading } = useChatStore();
+  const { messages, selectedModel, selectedTechniques, isLoading, loadChatHistory } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load chat history on mount
+  useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
 
   return (
     <div className="flex flex-col h-full">

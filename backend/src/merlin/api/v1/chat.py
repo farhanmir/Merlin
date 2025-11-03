@@ -2,9 +2,24 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException
-from merlin.api.deps import KeyRepoDep, OptiLLMDep, SessionDep, SettingsDep
+from merlin.api.deps import (
+    ChatRepoDep,
+    CurrentUserDep,
+    KeyRepoDep,
+    OptiLLMDep,
+    SessionDep,
+    SettingsDep,
+)
 from merlin.core.security import decrypt_api_key
-from merlin.schemas.chat import ChatRequest, ModelInfo, ModelList
+from merlin.schemas.chat import (
+    ChatMessageResponse,
+    ChatRequest,
+    ModelInfo,
+    ModelList,
+    SaveMessageRequest,
+    SessionHistoryResponse,
+    SessionListResponse,
+)
 
 router = APIRouter()
 
@@ -53,13 +68,13 @@ PROVIDER_MODELS = {
 
 
 @router.get("/models", response_model=ModelList)
-async def list_models(key_repo: KeyRepoDep) -> ModelList:
+async def list_models(user_id: CurrentUserDep, key_repo: KeyRepoDep) -> ModelList:
     """
-    List available models based on configured API keys.
+    List available models based on configured API keys for the authenticated user.
 
     Returns only models for providers that have valid API keys configured.
     """
-    keys = await key_repo.get_all()
+    keys = await key_repo.get_all(user_id)
     available_models: list[ModelInfo] = []
 
     for key in keys:
@@ -72,12 +87,13 @@ async def list_models(key_repo: KeyRepoDep) -> ModelList:
 @router.post("/completions")
 async def chat_completions(
     request: ChatRequest,
+    user_id: CurrentUserDep,
     key_repo: KeyRepoDep,
     optillm_service: OptiLLMDep,
     settings: SettingsDep,
 ) -> Any:
     """
-    Send a chat completion request with optional streaming.
+    Send a chat completion request with optional streaming for the authenticated user.
 
     Supports OptiLLM techniques by prefixing the model name.
     """
@@ -119,8 +135,8 @@ async def chat_completions(
     if not provider:
         raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
 
-    # Get and decrypt the API key
-    api_key_record = await key_repo.get_by_provider(provider)
+    # Get and decrypt the API key for the authenticated user
+    api_key_record = await key_repo.get_by_provider(user_id, provider)
     if not api_key_record:
         raise HTTPException(
             status_code=400,
@@ -344,3 +360,90 @@ async def chat_completions(
             status_code=500,
             detail=f"Unexpected error: {str(e)}. {error_hint}",
         )
+
+
+# Chat history endpoints
+@router.post("/messages", status_code=201)
+async def save_message(
+    request: SaveMessageRequest,
+    user_id: CurrentUserDep,
+    chat_repo: ChatRepoDep,
+) -> ChatMessageResponse:
+    """Save a chat message for the authenticated user."""
+    import json
+
+    message = await chat_repo.create_message(
+        user_id=user_id,
+        session_id=request.session_id,
+        role=request.role,
+        content=request.content,
+        model=request.model,
+        techniques=request.techniques,
+    )
+
+    return ChatMessageResponse(
+        id=message.id,
+        session_id=message.session_id,
+        role=message.role,
+        content=message.content,
+        model=message.model,
+        techniques=json.loads(message.techniques) if message.techniques else None,
+        created_at=message.created_at,
+    )
+
+
+@router.get("/sessions", response_model=SessionListResponse)
+async def list_sessions(
+    user_id: CurrentUserDep,
+    chat_repo: ChatRepoDep,
+) -> SessionListResponse:
+    """Get all chat sessions for the authenticated user."""
+    sessions = await chat_repo.get_all_sessions(user_id)
+    return SessionListResponse(sessions=sessions)
+
+
+@router.get("/sessions/{session_id}", response_model=SessionHistoryResponse)
+async def get_session_history(
+    session_id: str,
+    user_id: CurrentUserDep,
+    chat_repo: ChatRepoDep,
+) -> SessionHistoryResponse:
+    """Get all messages for a specific session."""
+    import json
+
+    messages = await chat_repo.get_messages_by_session(user_id, session_id)
+
+    return SessionHistoryResponse(
+        session_id=session_id,
+        messages=[
+            ChatMessageResponse(
+                id=msg.id,
+                session_id=msg.session_id,
+                role=msg.role,
+                content=msg.content,
+                model=msg.model,
+                techniques=json.loads(msg.techniques) if msg.techniques else None,
+                created_at=msg.created_at,
+            )
+            for msg in messages
+        ],
+    )
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: str,
+    user_id: CurrentUserDep,
+    chat_repo: ChatRepoDep,
+) -> None:
+    """Delete all messages in a session."""
+    await chat_repo.delete_session(user_id, session_id)
+
+
+@router.delete("/messages", status_code=204)
+async def delete_all_messages(
+    user_id: CurrentUserDep,
+    chat_repo: ChatRepoDep,
+) -> None:
+    """Delete all chat messages for the authenticated user."""
+    await chat_repo.delete_all_messages(user_id)

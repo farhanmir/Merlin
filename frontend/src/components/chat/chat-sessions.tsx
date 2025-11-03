@@ -1,12 +1,12 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
-import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function ChatSessions() {
   const [isMounted, setIsMounted] = useState(false);
-  const { sessions, currentSessionId, createNewSession, loadSession, deleteSession } = useChatStore();
+  const { sessions, currentSessionId, createNewSession, loadSession } = useChatStore();
 
   // Fix hydration mismatch by only rendering after mount
   useEffect(() => {
@@ -75,19 +75,9 @@ export function ChatSessions() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{session.title}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {session.messages.length} messages
+                    {new Date(session.createdAt).toLocaleDateString()}
                   </div>
                 </div>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteSession(session.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-all"
-                title="Delete chat"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
               </button>
             </div>
           ))

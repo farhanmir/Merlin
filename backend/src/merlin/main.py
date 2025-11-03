@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from merlin.api.health import router as health_router
+from merlin.api.v1.auth import router as auth_router
 from merlin.api.v1.chat import router as chat_router
 from merlin.api.v1.keys import router as keys_router
 from merlin.api.v1.workflows import router as workflows_router
@@ -47,6 +48,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router, tags=["health"])
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(keys_router, prefix="/api/v1/keys", tags=["keys"])
 app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflows"])

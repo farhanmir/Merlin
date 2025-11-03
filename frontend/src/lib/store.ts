@@ -18,6 +18,7 @@ interface ChatState {
   
   // Actions
   fetchModels: () => Promise<void>;
+  loadChatHistory: () => Promise<void>;
   setSelectedModel: (modelId: string) => void;
   toggleTechnique: (technique: Technique) => void;
   sendMessage: (content: string) => Promise<void>;
@@ -28,7 +29,7 @@ interface ChatState {
   
   // Session actions
   createNewSession: () => void;
-  loadSession: (sessionId: string) => void;
+  loadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => void;
   getCurrentSessionTitle: () => string;
 }
@@ -47,21 +48,70 @@ export const useChatStore = create<ChatState>()(
 
       fetchModels: async () => {
         try {
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat/models`
-          );
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          set({ availableModels: data.models || [] });
-          // Remove the toast notification - it's annoying on every navigation
+          // Use the authenticated API client from lib/api.ts
+          const { fetchModels: apiFetchModels } = await import('./api');
+          const models = await apiFetchModels();
+          set({ availableModels: models });
         } catch (error) {
           console.error('Failed to fetch models:', error);
-          toast.error('Failed to load models. Please check your connection.');
+          // Don't show toast if it's just a 401 (user not authenticated yet)
+          if (error instanceof Error && !error.message.includes('401')) {
+            toast.error('Failed to load models. Please check your connection.');
+          }
           set({ availableModels: [] });
+        }
+      },
+
+      loadChatHistory: async () => {
+        try {
+          const { fetchAllSessions, fetchSessionHistory } = await import('./api');
+          
+          // Get all user's sessions
+          const sessionIds = await fetchAllSessions();
+          
+          // Always start with a new empty session
+          const newSessionId = Date.now().toString();
+          
+          // Load first message from each session to get titles
+          const sessionsWithTitles = await Promise.all(
+            sessionIds.map(async (id) => {
+              try {
+                const messages = await fetchSessionHistory(id);
+                const firstMessage = messages[0];
+                const title = firstMessage 
+                  ? firstMessage.content.slice(0, 50) + (firstMessage.content.length > 50 ? '...' : '')
+                  : 'New Chat';
+                
+                return {
+                  id,
+                  title,
+                  messages: [], // Don't load all messages, just the title
+                  createdAt: firstMessage ? new Date(firstMessage.created_at) : new Date(),
+                  updatedAt: new Date(),
+                };
+              } catch (error) {
+                console.error(`Failed to load session ${id}:`, error);
+                return {
+                  id,
+                  title: 'Chat Session',
+                  messages: [],
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
+              }
+            })
+          );
+          
+          set({ 
+            currentSessionId: newSessionId, 
+            messages: [],
+            sessions: sessionsWithTitles
+          });
+        } catch (error) {
+          console.error('Failed to load chat history:', error);
+          // On error, create a new session
+          const newSessionId = Date.now().toString();
+          set({ currentSessionId: newSessionId, messages: [], sessions: [] });
         }
       },
 
@@ -79,11 +129,18 @@ export const useChatStore = create<ChatState>()(
       },
 
       sendMessage: async (content: string) => {
-        const { selectedModel, selectedTechniques, messages } = get();
+        const { selectedModel, selectedTechniques, messages, currentSessionId } = get();
 
         if (!selectedModel) {
           toast.error('Please select a model first');
           return;
+        }
+
+        // Ensure we have a session ID
+        let sessionId = currentSessionId;
+        if (!sessionId) {
+          sessionId = Date.now().toString();
+          set({ currentSessionId: sessionId });
         }
 
         const userMessage: Message = {
@@ -94,6 +151,18 @@ export const useChatStore = create<ChatState>()(
         };
 
         set({ messages: [...messages, userMessage], isLoading: true });
+
+        // Save user message to backend
+        try {
+          const { saveMessage } = await import('./api');
+          await saveMessage(sessionId, 'user', content);
+        } catch (error) {
+          console.error('❌ Failed to save user message:', error);
+          // Don't block on save failure, but show the error
+          if (error instanceof Error) {
+            console.error('Error details:', error.message);
+          }
+        }
 
         const startTime = new Date();
         const assistantMessage: Message = {
@@ -141,6 +210,27 @@ export const useChatStore = create<ChatState>()(
                       : msg
                   ),
                 }));
+
+                // Save assistant message to backend
+                const finalMessage = get().messages.find(msg => msg.id === assistantMessage.id);
+                if (finalMessage && finalMessage.content) {
+                  try {
+                    const { saveMessage } = await import('./api');
+                    await saveMessage(
+                      sessionId,
+                      'assistant',
+                      finalMessage.content,
+                      selectedModel,
+                      selectedTechniques.length > 0 ? selectedTechniques : undefined
+                    );
+                  } catch (error) {
+                    console.error('❌ Failed to save assistant message:', error);
+                    if (error instanceof Error) {
+                      console.error('Error details:', error.message);
+                    }
+                  }
+                }
+
                 break;
               }
 
@@ -198,6 +288,25 @@ export const useChatStore = create<ChatState>()(
                 : msg
             ),
           }));
+
+          // Save assistant message to backend
+          if (content) {
+            try {
+              const { saveMessage } = await import('./api');
+              await saveMessage(
+                sessionId,
+                'assistant',
+                content,
+                selectedModel,
+                selectedTechniques.length > 0 ? selectedTechniques : undefined
+              );
+            } catch (error) {
+              console.error('❌ Failed to save assistant message (non-streaming):', error);
+              if (error instanceof Error) {
+                console.error('Error details:', error.message);
+              }
+            }
+          }
         }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -214,7 +323,7 @@ export const useChatStore = create<ChatState>()(
           set((state) => ({
             messages: state.messages.map((msg) =>
               msg.id === assistantMessage.id
-                ? { ...msg, content: `❌ Error: ${errorMessage}\n\nClick the retry button above to try again.` }
+                ? { ...msg, content: `❌ Error: ${errorMessage}` }
                 : msg
             ),
           }));
@@ -224,7 +333,18 @@ export const useChatStore = create<ChatState>()(
       },
 
       clearMessages: () => {
+        const { currentSessionId } = get();
         set({ messages: [] });
+        
+        // Also delete from backend if we have a session
+        if (currentSessionId) {
+          import('./api').then(({ deleteSession }) => {
+            deleteSession(currentSessionId).catch((error) => {
+              console.error('Failed to delete session from backend:', error);
+            });
+          });
+        }
+        
         toast.success('Chat cleared successfully');
       },
 
@@ -298,22 +418,34 @@ export const useChatStore = create<ChatState>()(
         toast.success('New chat started');
       },
 
-      loadSession: (sessionId: string) => {
-        const { sessions, currentSessionId, messages } = get();
+      loadSession: async (sessionId: string) => {
+        const { currentSessionId } = get();
         
-        // Save current session before loading new one
-        if (currentSessionId && messages.length > 0) {
-          get().createNewSession(); // This will save current session
-        }
+        // Don't reload if already on this session
+        if (currentSessionId === sessionId) return;
         
-        const session = sessions.find(s => s.id === sessionId);
-        if (session) {
+        try {
+          // Fetch messages from backend for this session
+          const { fetchSessionHistory } = await import('./api');
+          const backendMessages = await fetchSessionHistory(sessionId);
+          
+          // Convert backend messages to frontend format
+          const formattedMessages: Message[] = backendMessages.map((msg) => ({
+            id: msg.id.toString(),
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            model: msg.model || undefined,
+            techniques: (msg.techniques || []) as Technique[],
+          }));
+
           set({
-            currentSessionId: session.id,
-            messages: session.messages,
-            selectedModel: session.model || null,
-            selectedTechniques: (session.techniques || []) as Technique[],
+            currentSessionId: sessionId,
+            messages: formattedMessages,
           });
+        } catch (error) {
+          console.error('Failed to load session:', error);
+          toast.error('Failed to load chat session');
         }
       },
 
@@ -335,24 +467,12 @@ export const useChatStore = create<ChatState>()(
     {
       name: 'merlin-chat-storage',
       partialize: (state) => ({
-        messages: state.messages,
+        // Don't persist messages - they're stored in backend now
+        // Only persist UI preferences
         selectedModel: state.selectedModel,
         selectedTechniques: state.selectedTechniques,
+        currentSessionId: state.currentSessionId, // Keep session ID for continuity
       }),
-      // Custom merge to handle Date deserialization
-      merge: (persistedState, currentState) => {
-        const state = { ...currentState, ...(persistedState as any) };
-        // Convert timestamp strings back to Date objects
-        if (state.messages) {
-          state.messages = state.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-            startTime: msg.startTime ? new Date(msg.startTime) : undefined,
-            endTime: msg.endTime ? new Date(msg.endTime) : undefined,
-          }));
-        }
-        return state;
-      },
     }
   )
 );
