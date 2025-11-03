@@ -74,7 +74,7 @@ export function Message({ role, content, timestamp }: Readonly<MessageProps>) {
           ) : (
             <ReactMarkdown
               components={{
-                code({ className, children, ...props }) {
+                code({ className, children, ref: _ref, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');
                   const codeString = String(children).replace(/\n$/, '');
                   const isInline = !match;
@@ -103,7 +103,6 @@ export function Message({ role, content, timestamp }: Readonly<MessageProps>) {
                         language={match ? match[1] : 'text'}
                         PreTag="div"
                         className="rounded-lg !mt-2"
-                        {...props}
                       >
                         {codeString}
                       </SyntaxHighlighter>
