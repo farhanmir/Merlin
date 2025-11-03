@@ -215,7 +215,71 @@ async def chat_completions(
                         media_type="text/event-stream",
                     )
                 else:
-                    return response.json()
+                    # Transform provider-specific response to OpenAI format
+                    response_data = response.json()
+
+                    if provider == "google":
+                        # Google format: {"candidates": [{"content": {"parts": [{"text": "..."}]}}]}
+                        # Transform to OpenAI format
+                        text = ""
+                        if (
+                            "candidates" in response_data
+                            and len(response_data["candidates"]) > 0
+                        ):
+                            candidate = response_data["candidates"][0]
+                            if (
+                                "content" in candidate
+                                and "parts" in candidate["content"]
+                            ):
+                                text = "".join(
+                                    part.get("text", "")
+                                    for part in candidate["content"]["parts"]
+                                )
+
+                        return {
+                            "id": "chatcmpl-google",
+                            "object": "chat.completion",
+                            "created": 0,
+                            "model": base_model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "message": {"role": "assistant", "content": text},
+                                    "finish_reason": "stop",
+                                }
+                            ],
+                        }
+
+                    elif provider == "anthropic":
+                        # Anthropic format: {"content": [{"text": "..."}]}
+                        # Transform to OpenAI format
+                        text = ""
+                        if "content" in response_data:
+                            text = "".join(
+                                block.get("text", "")
+                                for block in response_data["content"]
+                                if block.get("type") == "text"
+                            )
+
+                        return {
+                            "id": "chatcmpl-anthropic",
+                            "object": "chat.completion",
+                            "created": 0,
+                            "model": base_model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "message": {"role": "assistant", "content": text},
+                                    "finish_reason": response_data.get(
+                                        "stop_reason", "stop"
+                                    ),
+                                }
+                            ],
+                        }
+
+                    else:
+                        # OpenAI format - return as-is
+                        return response_data
         except httpx.HTTPError as e:
             raise HTTPException(
                 status_code=500,
