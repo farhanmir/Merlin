@@ -5,6 +5,7 @@ import { OnboardingGuide } from '@/components/chat/onboarding-guide';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ChatSessions } from '@/components/chat/chat-sessions';
 import { AdvancedSettings } from '@/components/chat/advanced-settings';
+import { ServerStatus } from '@/components/server-status';
 import { Home, Settings, BarChart3, Workflow } from 'lucide-react';
 
 const navigationItems = [
@@ -21,6 +22,7 @@ export default function ChatLayout({
 }>) {
   return (
     <ErrorBoundary>
+      <ServerStatus />
       <div className="flex h-screen overflow-hidden">
         <Sidebar navigationItems={navigationItems}>
           <div className="space-y-4">

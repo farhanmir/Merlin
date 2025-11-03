@@ -10,6 +10,9 @@ export interface Message {
   tokenCount?: number;
   model?: string;
   techniques?: string[];
+  // Error handling
+  isError?: boolean;
+  userMessageId?: string; // ID of the user message that triggered this response (for retry)
 }
 
 export interface ChatSession {

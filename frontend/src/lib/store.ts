@@ -22,6 +22,7 @@ interface ChatState {
   setSelectedModel: (modelId: string) => void;
   toggleTechnique: (technique: Technique) => void;
   sendMessage: (content: string) => Promise<void>;
+  retryMessage: (messageId: string) => Promise<void>;
   clearMessages: () => void;
   exportAsMarkdown: () => string;
   exportAsJSON: () => string;
@@ -173,6 +174,7 @@ export const useChatStore = create<ChatState>()(
           startTime,
           model: selectedModel,
           techniques: selectedTechniques,
+          userMessageId: userMessage.id, // Link to user message for retry
         };
 
         set({ messages: [...get().messages, assistantMessage] });
@@ -323,13 +325,37 @@ export const useChatStore = create<ChatState>()(
           set((state) => ({
             messages: state.messages.map((msg) =>
               msg.id === assistantMessage.id
-                ? { ...msg, content: `❌ Error: ${errorMessage}` }
+                ? { ...msg, content: `❌ Error: ${errorMessage}`, isError: true }
                 : msg
             ),
           }));
         } finally {
           set({ isLoading: false });
         }
+      },
+
+      retryMessage: async (messageId: string) => {
+        const { messages } = get();
+        
+        // Find the error message
+        const errorMessage = messages.find(msg => msg.id === messageId);
+        if (!errorMessage || !errorMessage.userMessageId) {
+          toast.error('Cannot retry this message');
+          return;
+        }
+        
+        // Find the original user message
+        const userMessage = messages.find(msg => msg.id === errorMessage.userMessageId);
+        if (!userMessage) {
+          toast.error('Original message not found');
+          return;
+        }
+        
+        // Remove the error message
+        set({ messages: messages.filter(msg => msg.id !== messageId) });
+        
+        // Resend the original message
+        await get().sendMessage(userMessage.content);
       },
 
       clearMessages: () => {

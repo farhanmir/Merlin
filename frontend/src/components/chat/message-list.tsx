@@ -2,12 +2,15 @@
 
 import { Message } from './message';
 import type { Message as MessageType } from '@/lib/types';
+import { useChatStore } from '@/lib/store';
 
 interface MessageListProps {
   messages: MessageType[];
 }
 
 export function MessageList({ messages }: MessageListProps) {
+  const { retryMessage } = useChatStore();
+
   if (messages.length === 0) {
     return null;
   }
@@ -20,6 +23,8 @@ export function MessageList({ messages }: MessageListProps) {
           role={message.role}
           content={message.content}
           timestamp={message.timestamp}
+          isError={message.isError}
+          onRetry={message.isError ? () => retryMessage(message.id) : undefined}
         />
       ))}
     </div>
