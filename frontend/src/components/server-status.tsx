@@ -6,7 +6,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 export function ServerStatus() {
   const [status, setStatus] = useState<'checking' | 'healthy' | 'error'>('checking');
   const [attempt, setAttempt] = useState(0);
-  const maxAttempts = 30; // 30 seconds total (1 check per second)
+  const maxAttempts = 60; // 60 seconds total (Render cold start can take 30-60s)
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -84,7 +84,7 @@ export function ServerStatus() {
                     Waking up servers...
                   </h2>
                   <p className="text-slate-400 text-sm">
-                    This may take up to 30 seconds on first load
+                    Render Free Tier cold start may take 30-60 seconds
                   </p>
                   <div className="mt-4 flex items-center justify-center gap-2">
                     <div className="h-1.5 w-32 bg-slate-700 rounded-full overflow-hidden">
@@ -127,7 +127,7 @@ export function ServerStatus() {
           {/* Info */}
           <div className="text-center">
             <p className="text-xs text-slate-500">
-              Render free tier servers sleep after inactivity
+              Render Free Tier: Servers auto-sleep after 15 minutes of inactivity
             </p>
           </div>
         </div>
