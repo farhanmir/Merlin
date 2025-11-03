@@ -142,47 +142,62 @@ async def chat_completions(
 
     # If no OptiLLM techniques are selected, bypass OptiLLM and call provider directly
     if not request.techniques or len(request.techniques) == 0:
-        # Direct provider call without OptiLLM
-        provider_urls = {
-            "openai": "https://api.openai.com/v1/chat/completions",
-            "anthropic": "https://api.anthropic.com/v1/messages",
-            "google": "https://generativelanguage.googleapis.com/v1beta/models",
-        }
-
-        if provider not in provider_urls:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Direct API calls not supported for provider: {provider}",
-            )
-
         try:
-            # Call provider API directly
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
+            # Call provider API directly based on provider type
+            if provider == "openai":
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                }
+                payload = {
+                    "model": base_model,
+                    "messages": [msg.model_dump() for msg in request.messages],
+                    "stream": request.stream,
+                }
+                url = "https://api.openai.com/v1/chat/completions"
 
-            # Anthropic uses different header format
-            if provider == "anthropic":
+            elif provider == "anthropic":
                 headers = {
                     "x-api-key": api_key,
                     "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json",
                 }
+                payload = {
+                    "model": base_model,
+                    "messages": [msg.model_dump() for msg in request.messages],
+                    "max_tokens": 4096,
+                    "stream": request.stream,
+                }
+                url = "https://api.anthropic.com/v1/messages"
 
-            payload = {
-                "model": base_model,
-                "messages": [msg.model_dump() for msg in request.messages],
-                "stream": request.stream,
-            }
+            elif provider == "google":
+                # Google uses API key as query parameter
+                headers = {
+                    "Content-Type": "application/json",
+                }
+                # Convert messages to Google's format
+                contents = []
+                for msg in request.messages:
+                    contents.append(
+                        {
+                            "role": "user" if msg.role == "user" else "model",
+                            "parts": [{"text": msg.content}],
+                        }
+                    )
+                payload = {
+                    "contents": contents,
+                }
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{base_model}:generateContent?key={api_key}"
 
-            # Anthropic uses max_tokens instead of max_completion_tokens
-            if provider == "anthropic":
-                payload["max_tokens"] = 4096
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Direct API calls not supported for provider: {provider}",
+                )
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
-                    provider_urls[provider],
+                    url,
                     json=payload,
                     headers=headers,
                 )
@@ -205,9 +220,7 @@ async def chat_completions(
             raise HTTPException(
                 status_code=500,
                 detail=f"Provider API error: {str(e)}",
-            )
-
-    # Call OptiLLM service when techniques are selected
+            )  # Call OptiLLM service when techniques are selected
     try:
         response = await optillm_service.chat_completion(
             model=request.model,
