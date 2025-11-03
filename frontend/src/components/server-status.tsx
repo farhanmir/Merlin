@@ -53,8 +53,8 @@ export function ServerStatus() {
         if (detailedResponse.ok) {
           const data = await detailedResponse.json();
           
-          // Check if database is healthy
-          const dbHealthy = data.database?.status === 'healthy';
+          // Check if database is healthy (new structure: data.services.database)
+          const dbHealthy = data.services?.database?.status === 'healthy';
           const overallHealthy = data.overall_status === 'healthy';
           
           if (isMounted) {
