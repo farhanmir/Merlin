@@ -1,8 +1,12 @@
 """Direct integration of OptiLLM inference optimization techniques."""
 
 import asyncio
-from typing import Any
+import logging
+import time
+from collections import deque
+from typing import Any, Callable
 
+from fastapi import HTTPException
 from merlin.optillm.bon import best_of_n_sampling
 from merlin.optillm.cot_reflection import cot_reflection
 from merlin.optillm.leap import leap
@@ -16,7 +20,98 @@ from merlin.optillm.reread import re2_approach
 from merlin.optillm.rstar import RStar
 from merlin.optillm.rto import round_trip_optimization
 from merlin.optillm.self_consistency import advanced_self_consistency_approach
-from openai import OpenAI
+from openai import APIError, OpenAI, RateLimitError
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimiter:
+    """
+    Intelligent rate limiter that tracks API calls and enforces delays.
+
+    Google Gemini Free Tier: 15 RPM (requests per minute)
+    OpenAI Free Tier: 3 RPM
+    """
+
+    def __init__(self, provider: str):
+        self.provider = provider
+        self.request_times = deque(maxlen=50)  # Track last 50 requests
+
+        # Rate limits per provider (requests per minute)
+        self.limits = {
+            "google": 15,
+            "openai": 3,
+            "anthropic": 50,  # Higher limit
+        }
+
+        # Minimum delay between requests (seconds)
+        self.min_delays = {
+            "google": 4.5,  # 15 RPM = 1 request per 4 seconds, add buffer
+            "openai": 20,  # 3 RPM = 1 request per 20 seconds
+            "anthropic": 1.5,
+        }
+
+    def get_delay(self) -> float:
+        """Calculate how long to wait before next request."""
+        if not self.request_times:
+            return 0
+
+        # Time since last request
+        time_since_last = time.time() - self.request_times[-1]
+        min_delay = self.min_delays.get(self.provider, 1.0)
+
+        # If we haven't waited long enough, return remaining wait time
+        if time_since_last < min_delay:
+            return min_delay - time_since_last
+
+        return 0
+
+    def get_requests_in_last_minute(self) -> int:
+        """Count requests made in the last 60 seconds."""
+        cutoff = time.time() - 60
+        return sum(1 for t in self.request_times if t > cutoff)
+
+    def should_throttle(self) -> tuple[bool, float]:
+        """
+        Check if we should throttle.
+
+        Returns:
+            (should_throttle, wait_time_seconds)
+        """
+        limit = self.limits.get(self.provider, 60)
+        current_rpm = self.get_requests_in_last_minute()
+
+        if current_rpm >= limit:
+            # Need to wait until oldest request expires
+            oldest = self.request_times[0]
+            wait_time = 60 - (time.time() - oldest) + 1  # Add 1 sec buffer
+            return True, max(wait_time, 0)
+
+        return False, 0
+
+    async def wait_if_needed(self, progress_callback: Callable[[str], None] = None):
+        """Wait if rate limit requires it, with optional progress updates."""
+        # Check if we're at limit
+        should_throttle, throttle_wait = self.should_throttle()
+        if should_throttle:
+            if progress_callback:
+                progress_callback(
+                    f"⏳ Rate limit reached. Waiting {int(throttle_wait)}s..."
+                )
+            logger.warning(
+                f"Rate limit reached for {self.provider}. Waiting {throttle_wait:.1f}s"
+            )
+            await asyncio.sleep(throttle_wait)
+
+        # Check minimum delay since last request
+        delay = self.get_delay()
+        if delay > 0:
+            if progress_callback and delay > 2:
+                progress_callback(f"⏱️ Pacing requests... ({delay:.0f}s)")
+            await asyncio.sleep(delay)
+
+        # Record this request
+        self.request_times.append(time.time())
 
 
 class OptiLLMService:
@@ -107,7 +202,7 @@ class OptiLLMService:
         techniques: list[str],
     ) -> str:
         """
-        Apply OptiLLM techniques to the chat completion.
+        Apply OptiLLM techniques to the chat completion with intelligent rate limiting.
 
         Args:
             provider: LLM provider (openai, anthropic, google)
@@ -118,15 +213,22 @@ class OptiLLMService:
 
         Returns:
             Final response text after applying all techniques
+
+        Raises:
+            RateLimitError: If rate limit is exceeded after retries
         """
         # Create LLM client
         client = self._create_client(provider, api_key)
+
+        # Create rate limiter for this provider
+        rate_limiter = RateLimiter(provider)
 
         # Parse messages into OptiLLM format
         system_prompt, initial_query = self._parse_messages(messages)
 
         # If no techniques, use direct client call
         if not techniques:
+            await rate_limiter.wait_if_needed()
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -134,28 +236,76 @@ class OptiLLMService:
             )
             return response.choices[0].message.content
 
+        # Log technique execution plan
+        logger.info(
+            f"Applying {len(techniques)} OptiLLM technique(s): {', '.join(techniques)}"
+        )
+
         # Apply techniques sequentially (chained)
         final_response = initial_query
-        for technique in techniques:
+        for idx, technique in enumerate(techniques, 1):
             if technique not in self.TECHNIQUES:
                 raise ValueError(f"Unknown technique: {technique}")
 
             # Get the technique function
             technique_func = self.TECHNIQUES[technique]
 
-            # Execute technique (run in thread pool since they're synchronous)
-            response, _ = await asyncio.to_thread(
-                self._execute_technique,
-                technique,
-                technique_func,
-                system_prompt,
-                final_response,
-                client,
-                model,
+            # Log progress
+            logger.info(f"[{idx}/{len(techniques)}] Executing technique: {technique}")
+
+            # Wait if needed to avoid rate limit (proactive throttling)
+            await rate_limiter.wait_if_needed(
+                progress_callback=lambda msg: logger.info(msg)
             )
 
-            final_response = response
+            # Execute technique with retry logic
+            max_retries = 3
+            retry_count = 0
 
+            while retry_count < max_retries:
+                try:
+                    # Execute technique (run in thread pool since they're synchronous)
+                    response, _ = await asyncio.to_thread(
+                        self._execute_technique,
+                        technique,
+                        technique_func,
+                        system_prompt,
+                        final_response,
+                        client,
+                        model,
+                    )
+                    final_response = response
+                    logger.info(f"✓ {technique} completed successfully")
+                    break  # Success, exit retry loop
+
+                except RateLimitError as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        logger.error(
+                            f"Rate limit exceeded for {technique} after {max_retries} retries"
+                        )
+                        raise HTTPException(
+                            status_code=429,
+                            detail=f"⏱️ Rate limit exceeded. Please try again in a few minutes. "
+                            f"Tip: Use fewer techniques ({len(techniques)} selected) to avoid limits.",
+                        ) from e
+
+                    # Exponential backoff: 5s, 10s, 20s
+                    wait_time = 5 * (2 ** (retry_count - 1))
+                    logger.warning(
+                        f"Rate limit hit on {technique}. "
+                        f"Retry {retry_count}/{max_retries} in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+
+                except APIError as e:
+                    logger.error(f"API error in {technique}: {str(e)}")
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"LLM API error in {technique}: {str(e)}",
+                    ) from e
+
+        logger.info(f"All {len(techniques)} techniques completed successfully")
         return final_response
 
     def _execute_technique(
