@@ -210,7 +210,7 @@ class OptiLLMService:
         """
         Clean technique response before passing to next technique.
 
-        Some techniques (like plansearch) return code blocks or structured outputs
+        Some techniques (like plansearch, cot_reflection) return code blocks or structured outputs
         that cause issues when passed to subsequent techniques, especially with
         Google's Gemini API which rejects non-struct values.
 
@@ -226,6 +226,8 @@ class OptiLLMService:
         # If response contains code blocks, extract just the conceptual answer
         # Code blocks cause "Value is not a struct" errors with Google Gemini
         if "```" in response:
+            logger.info("Response contains code blocks, cleaning for next technique")
+
             # Try to find explanatory text before code blocks
             parts = response.split("```")
             if len(parts) > 1:
@@ -233,32 +235,53 @@ class OptiLLMService:
                 before_code = parts[0].strip()
                 if before_code and len(before_code) > 50:
                     # If there's substantial text before code, use that
+                    logger.info("Using text before code blocks")
                     return before_code
 
-                # Otherwise, try to extract the answer from within code comments
-                # or look for text between code blocks
+                # Otherwise, try to extract the answer from within code blocks
+                # Look for variable assignments like: word = "heroine"
+                for i in range(1, len(parts), 2):
+                    code_block = parts[i] if i < len(parts) else ""
+
+                    # Look for the actual answer in the code (e.g., word = "heroine")
+                    answer_match = re.search(
+                        r'(?:word|answer|result|solution)\s*=\s*["\']([^"\']+)["\']',
+                        code_block,
+                        re.IGNORECASE,
+                    )
+                    if answer_match:
+                        answer = answer_match.group(1)
+                        logger.info(f"Extracted answer from code: {answer}")
+                        return f"The answer is: {answer}"
+
+                    # Look for docstrings or comments explaining the answer
+                    docstring_match = re.search(r'"""(.*?)"""', code_block, re.DOTALL)
+                    if docstring_match:
+                        docstring = docstring_match.group(1).strip()
+                        if len(docstring) > 30:
+                            logger.info("Using docstring as answer")
+                            return docstring
+
+                # Check text between code blocks
                 for i in range(1, len(parts), 2):
                     if i + 1 < len(parts):
                         between_blocks = parts[i + 1].strip()
                         if between_blocks and len(between_blocks) > 30:
+                            logger.info("Using text between code blocks")
                             return between_blocks
 
-            # Last resort: try to extract answer from code comments
-            code_match = re.search(r"```(?:python)?\n(.*?)```", response, re.DOTALL)
-            if code_match:
-                code_content = code_match.group(1)
-                # Look for docstrings or comments explaining the answer
-                docstring_match = re.search(r'"""(.*?)"""', code_content, re.DOTALL)
-                if docstring_match:
-                    return docstring_match.group(1).strip()
+            # Last resort: completely strip all code blocks and return remaining text
+            cleaned = re.sub(r"```[^`]*```", "", response, flags=re.DOTALL)
+            cleaned = cleaned.strip()
+            if cleaned and len(cleaned) > 20:
+                logger.info("Stripped all code blocks, using remaining text")
+                return cleaned
 
-                # Look for the actual answer in the code (e.g., word = "heroine")
-                answer_match = re.search(
-                    r'(?:word|answer|result)\s*=\s*["\']([^"\']+)["\']', code_content
-                )
-                if answer_match:
-                    answer = answer_match.group(1)
-                    return f"The answer is: {answer}"
+            # If all else fails, extract a simple answer
+            logger.warning(
+                "Could not clean code blocks properly, using generic response"
+            )
+            return "Based on the analysis above, the answer has been determined."
 
         # If no code blocks or couldn't extract, return as-is
         # but limit length to avoid token issues
