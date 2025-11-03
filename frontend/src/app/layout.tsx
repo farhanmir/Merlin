@@ -19,6 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'Merlin - Agentic AI Workbench',
   description: 'A modern AI workbench with BYOK support and OptiLLM integration',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

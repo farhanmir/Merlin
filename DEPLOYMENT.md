@@ -12,7 +12,7 @@
 
 **Your Neon connection string format:**
 ```
-postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE?sslmode=require
+postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE
 ```
 
 **Steps:**
@@ -21,11 +21,11 @@ postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE?sslmode=require
 3. Click "Reset password" if needed (this fixes "password authentication failed")
 4. Copy the connection string
 5. Replace `postgresql://` with `postgresql+asyncpg://`
-6. Add `?sslmode=require` at the end
+6. **Remove any SSL parameters** (asyncpg handles SSL automatically for Neon)
 
 **Example:**
 ```
-postgresql+asyncpg://farhanmir:NEW_PASSWORD@ep-something.us-east-2.aws.neon.tech/merlin?sslmode=require
+postgresql+asyncpg://farhanmir:NEW_PASSWORD@ep-something.us-east-2.aws.neon.tech/merlin
 ```
 
 ### 2. Run Database Migration on Neon
@@ -85,7 +85,7 @@ Go to https://dashboard.render.com → Your Merlin backend service → Environme
 
 ```bash
 # Database (CRITICAL - update this!)
-DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE?sslmode=require
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE
 
 # JWT Secret (CRITICAL - use the generated one below!)
 JWT_SECRET_KEY=a77271822bec91e9f2b99b07cc4a3ee63ad359d2f465f9c427224904796abf0c
