@@ -15,7 +15,7 @@ function SignInForm() {
     password: '',
   });
 
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = searchParams.get('callbackUrl') || '/chat';
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);

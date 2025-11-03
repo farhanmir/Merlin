@@ -54,12 +54,15 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnChat = nextUrl.pathname.startsWith('/');
+      const isOnChat = nextUrl.pathname.startsWith('/chat') || 
+                      nextUrl.pathname.startsWith('/settings') ||
+                      nextUrl.pathname.startsWith('/workflows') ||
+                      nextUrl.pathname.startsWith('/analytics');
       const isOnAuth = nextUrl.pathname.startsWith('/auth');
 
       if (isOnAuth) {
         if (isLoggedIn) {
-          return Response.redirect(new URL('/', nextUrl));
+          return Response.redirect(new URL('/chat', nextUrl));
         }
         return true;
       }
