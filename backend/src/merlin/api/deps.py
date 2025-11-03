@@ -36,7 +36,7 @@ def get_optillm_service() -> OptiLLMService:
 
 def get_external_api_service(settings: SettingsDep) -> ExternalAPIService:
     """Dependency for external API service."""
-    return ExternalAPIService(settings)
+    return ExternalAPIService(settings=settings)
 
 
 async def get_current_user_id(

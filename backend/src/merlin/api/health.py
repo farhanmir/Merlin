@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
-from merlin.api.deps import ExternalAPIDep, KeyRepoDep, OptiLLMDep, get_session
+from merlin.api.deps import get_session
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,19 +30,15 @@ async def readiness_check() -> dict[str, str]:
 @router.get("/health/detailed")
 async def detailed_health_check(
     session: AsyncSession = Depends(get_session),
-    optillm: OptiLLMDep = None,
-    key_repo: KeyRepoDep = None,
-    external_api_service: ExternalAPIDep = None,
 ) -> dict:
     """
     Detailed health check for all services and dependencies.
     Returns status of database, OptiLLM, configured API keys, and external APIs.
     """
     health_status = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "overall_status": "healthy",
         "services": {},
-        "api_keys": {},
         "external_apis": {},
     }
 
@@ -63,21 +59,16 @@ async def detailed_health_check(
     # Check OptiLLM service (direct integration)
     try:
         # OptiLLM is directly integrated, verify it's available
-        if optillm is not None:
-            technique_count = len(optillm.TECHNIQUES)
-            health_status["services"]["optillm"] = {
-                "status": "healthy",
-                "message": "OptiLLM direct integration active",
-                "integration": "direct",
-                "techniques_available": technique_count,
-            }
-        else:
-            health_status["services"]["optillm"] = {
-                "status": "unavailable",
-                "message": "OptiLLM service not initialized",
-                "integration": "direct",
-            }
-            health_status["overall_status"] = "degraded"
+        from merlin.services.optillm_service import OptiLLMService
+
+        optillm = OptiLLMService()
+        technique_count = len(optillm.TECHNIQUES)
+        health_status["services"]["optillm"] = {
+            "status": "healthy",
+            "message": "OptiLLM direct integration active",
+            "integration": "direct",
+            "techniques_available": technique_count,
+        }
     except Exception as e:
         health_status["services"]["optillm"] = {
             "status": "unhealthy",
@@ -86,27 +77,17 @@ async def detailed_health_check(
         }
         health_status["overall_status"] = "degraded"
 
-    # Check API key configuration
-    if key_repo:
-        try:
-            providers = ["openai", "anthropic", "google"]
-            for provider in providers:
-                key = await key_repo.get_by_provider(provider)
-                health_status["api_keys"][provider] = {
-                    "configured": key is not None,
-                    "valid": key.is_valid if key else False,
-                }
-        except Exception as e:
-            health_status["api_keys"]["error"] = str(e)
+    # Check external API configuration (no authentication required)
+    try:
+        from merlin.services.external_api_service import ExternalAPIService
 
-    # Check external API configuration
-    if external_api_service:
-        try:
-            api_health = (
-                external_api_service.check_api_health()
-            )  # No await - sync method
-            health_status["external_apis"] = api_health
-        except Exception as e:
-            health_status["external_apis"]["error"] = str(e)
+        external_api_service = ExternalAPIService()
+        api_health = external_api_service.check_api_health()
+        health_status["external_apis"] = api_health
+    except Exception as e:
+        health_status["external_apis"] = {
+            "status": "error",
+            "message": f"External API check failed: {str(e)}",
+        }
 
     return health_status

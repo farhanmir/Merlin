@@ -18,8 +18,8 @@ except ImportError:
 class ExternalAPIService:
     """Service for calling external AI detection and humanization APIs."""
 
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, settings=None):
+        self.settings = settings or get_settings()
         self.timeout = httpx.Timeout(
             120.0, read=300.0
         )  # Long timeout for API processing
