@@ -142,6 +142,7 @@ class OptiLLMService:
         "rto": round_trip_optimization,  # ~4 API calls
         # === ENABLED - Heavy API Usage (10-20+ calls) ===
         "mcts": chat_with_mcts,  # ~10-15 API calls (Monte Carlo tree search)
+        "rstar": "rstar",  # ~12 API calls (Reinforcement Learning Star - handled specially)
         # === DISABLED - Exceeds Free Tier Rate Limits (15 RPM) ===
         # "pvg": inference_time_pv_game,  # ~20+ API calls (2 rounds × 6 solutions + verification)
         # "re2": re2_approach,  # ~15+ API calls (multiple reasoning steps)

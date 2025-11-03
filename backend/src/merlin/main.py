@@ -113,6 +113,7 @@ app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflow
 
 
 @app.get("/")
+@app.head("/")
 async def root() -> dict[str, str]:
-    """Root endpoint."""
+    """Root endpoint supporting both GET and HEAD requests."""
     return {"message": "Merlin API", "version": "0.1.0"}
