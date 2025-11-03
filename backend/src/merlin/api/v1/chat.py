@@ -111,9 +111,9 @@ async def list_models(user_id: CurrentUserDep, key_repo: KeyRepoDep) -> ModelLis
 @router.post("/completions")
 @limiter.limit("30/hour")  # Aligned with Neon Free Tier (5 hours/day active time)
 async def chat_completions(
-    request_obj: Request,
+    request: Request,
     user_id: CurrentUserDep,
-    request: ChatRequest,
+    chat_request: ChatRequest,
     key_repo: KeyRepoDep,
     optillm_service: OptiLLMDep,
     settings: SettingsDep,
@@ -125,11 +125,11 @@ async def chat_completions(
     Rate limited to 30 requests per hour per user to preserve Neon Free Tier limits.
     """
     # Set user_id in request state for rate limiting
-    request_obj.state.user_id = user_id
+    request.state.user_id = user_id
 
     # Strip OptiLLM technique prefixes to get the base model name
     # Techniques like "moa-", "plansearch-", etc. are prefixed to model names
-    base_model = request.model
+    base_model = chat_request.model
     for prefix in [
         # Advanced Multi-Agent & Planning
         "mars-",
@@ -163,7 +163,9 @@ async def chat_completions(
             break
 
     if not provider:
-        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown model: {chat_request.model}"
+        )
 
     # Get and decrypt the API key for the authenticated user
     api_key_record = await key_repo.get_by_provider(user_id, provider)
@@ -187,11 +189,11 @@ async def chat_completions(
         )
 
     # If no OptiLLM techniques are selected, bypass OptiLLM and call provider directly
-    if not request.techniques or len(request.techniques) == 0:
+    if not chat_request.techniques or len(chat_request.techniques) == 0:
         try:
             # Disable streaming for Google/Anthropic (different SSE format than OpenAI)
             # They require response transformation which is easier with non-streaming
-            use_streaming = request.stream and provider == "openai"
+            use_streaming = chat_request.stream and provider == "openai"
 
             # Call provider API directly based on provider type
             if provider == "openai":
@@ -201,7 +203,7 @@ async def chat_completions(
                 }
                 payload = {
                     "model": base_model,
-                    "messages": [msg.model_dump() for msg in request.messages],
+                    "messages": [msg.model_dump() for msg in chat_request.messages],
                     "stream": use_streaming,
                 }
                 url = "https://api.openai.com/v1/chat/completions"
@@ -214,7 +216,7 @@ async def chat_completions(
                 }
                 payload = {
                     "model": base_model,
-                    "messages": [msg.model_dump() for msg in request.messages],
+                    "messages": [msg.model_dump() for msg in chat_request.messages],
                     "max_tokens": 4096,
                     "stream": False,  # Anthropic streaming format is different
                 }
@@ -227,7 +229,7 @@ async def chat_completions(
                 }
                 # Convert messages to Google's format
                 contents = []
-                for msg in request.messages:
+                for msg in chat_request.messages:
                     contents.append(
                         {
                             "role": "user" if msg.role == "user" else "model",
@@ -344,9 +346,9 @@ async def chat_completions(
         response_text = await optillm_service.apply_techniques(
             provider=provider,
             model=base_model,
-            messages=[msg.model_dump() for msg in request.messages],
+            messages=[msg.model_dump() for msg in chat_request.messages],
             api_key=api_key,
-            techniques=request.techniques,
+            techniques=chat_request.techniques,
         )
 
         # OptiLLM integration is non-streaming - return complete response
@@ -355,7 +357,7 @@ async def chat_completions(
             "id": "chatcmpl-optillm",
             "object": "chat.completion",
             "created": 0,
-            "model": request.model,
+            "model": chat_request.model,
             "choices": [
                 {
                     "index": 0,
