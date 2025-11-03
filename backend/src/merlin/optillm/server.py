@@ -19,22 +19,22 @@ from importlib.metadata import version
 from dataclasses import fields
 
 # Import approach modules
-from optillm.mcts import chat_with_mcts
-from optillm.bon import best_of_n_sampling
-from optillm.moa import mixture_of_agents
-from optillm.rto import round_trip_optimization
-from optillm.self_consistency import advanced_self_consistency_approach
-from optillm.pvg import inference_time_pv_game
-from optillm.z3_solver import Z3SymPySolverSystem
-from optillm.rstar import RStar
-from optillm.cot_reflection import cot_reflection
-from optillm.plansearch import plansearch
-from optillm.leap import leap
-from optillm.reread import re2_approach
-from optillm.cepo.cepo import cepo, CepoConfig, init_cepo_config
-from optillm.mars import multi_agent_reasoning_system
-from optillm.batching import RequestBatcher, BatchingError
-from optillm.conversation_logger import ConversationLogger
+from merlin.optillm.mcts import chat_with_mcts
+from merlin.optillm.bon import best_of_n_sampling
+from merlin.optillm.moa import mixture_of_agents
+from merlin.optillm.rto import round_trip_optimization
+from merlin.optillm.self_consistency import advanced_self_consistency_approach
+from merlin.optillm.pvg import inference_time_pv_game
+from merlin.optillm.z3_solver import Z3SymPySolverSystem
+from merlin.optillm.rstar import RStar
+from merlin.optillm.cot_reflection import cot_reflection
+from merlin.optillm.plansearch import plansearch
+from merlin.optillm.leap import leap
+from merlin.optillm.reread import re2_approach
+from merlin.optillm.cepo.cepo import cepo, CepoConfig, init_cepo_config
+from merlin.optillm.mars import multi_agent_reasoning_system
+from merlin.optillm.batching import RequestBatcher, BatchingError
+from merlin.optillm.conversation_logger import ConversationLogger
 import optillm.conversation_logger
 
 # Setup logging

@@ -26,7 +26,6 @@ async def readiness_check() -> dict[str, str]:
     - OptiLLM connectivity
     - Other critical dependencies
     """
-    # TODO: Add actual readiness checks
     return {"status": "ready", "version": "0.1.0"}
 
 

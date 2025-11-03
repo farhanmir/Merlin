@@ -1,3 +1,33 @@
+"""
+Merlin API - Agentic AI Workbench with OptiLLM Integration.
+
+This module initializes the FastAPI application with:
+- Authentication and authorization (JWT-based)
+- Encrypted API key management (Fernet encryption)
+- LLM chat completions with OptiLLM optimization techniques
+- Per-user rate limiting (30 requests/hour)
+- Workflow orchestration for multi-step agent tasks
+- Direct OptiLLM integration (no external proxy)
+
+Techniques available:
+- MOA (Mixture of Agents)
+- CoT Reflection (Chain-of-Thought with Reflection)
+- PlanSearch (Planning-based Search)
+- Best-of-N Sampling
+- Self-Consistency
+- PVG (Priority Value Game)
+- MCTS (Monte Carlo Tree Search)
+- Leap (Language-based Exploration and Planning)
+- RE2 (Retrieve-and-Evaluate-Rank)
+- RTO (Round-Trip Optimization)
+- RStar (Reinforcement Learning Star)
+
+Supported LLM Providers:
+- OpenAI (GPT-4o, GPT-4o Mini, o1, etc.)
+- Anthropic (Claude 3.5 Sonnet, Claude 3.5 Haiku, etc.)
+- Google (Gemini 2.5 Pro/Flash/Flash-Lite, Gemini 2.0 Flash, etc.)
+"""
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 

@@ -82,3 +82,13 @@ coverage.xml
 # Misc
 .vercel
 .turbo
+
+# Documentation (generated files - don't commit)
+ARCHITECTURE.md
+GIT_COMMIT_GUIDE.md
+PRODUCTION_READY.md
+CLEANUP_SUMMARY.md
+INTEGRATION_COMPLETE.md
+.github/copilot-instructions.md
+
+

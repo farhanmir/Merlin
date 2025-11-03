@@ -20,12 +20,12 @@ import platform
 import sys
 import re
 
-from optillm.cot_decoding import cot_decode
-from optillm.entropy_decoding import entropy_decode
-from optillm.thinkdeeper import thinkdeeper_decode
-from optillm.thinkdeeper_mlx import thinkdeeper_decode_mlx
-from optillm.autothink import autothink_decode
-from optillm.deepconf import deepconf_decode
+from merlin.optillm.cot_decoding import cot_decode
+from merlin.optillm.entropy_decoding import entropy_decode
+from merlin.optillm.thinkdeeper import thinkdeeper_decode
+from merlin.optillm.thinkdeeper_mlx import thinkdeeper_decode_mlx
+from merlin.optillm.autothink import autothink_decode
+from merlin.optillm.deepconf import deepconf_decode
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

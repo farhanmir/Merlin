@@ -1,3 +1,23 @@
+"""
+API key management endpoints for LLM provider authentication.
+
+This module handles:
+- Secure API key storage (encrypted with Fernet)
+- Key validation against provider endpoints
+- Key listing and deletion per user
+- Support for multiple LLM providers
+
+Supported Providers:
+- OpenAI (https://api.openai.com)
+- Anthropic (https://api.anthropic.com)
+- Google (https://generativelanguage.googleapis.com)
+
+Security:
+- Keys are encrypted at rest using Fernet (AES-128-CBC)
+- Keys are validated before storage
+- Keys are decrypted only when needed for API calls
+"""
+
 import httpx
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response

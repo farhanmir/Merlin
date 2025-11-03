@@ -6,10 +6,10 @@ A **2-pillar BYOK (Bring-Your-Own-Key) AI platform** that supercharges LLMs with
 
 Merlin is a production-ready AI workbench with:
 
-1. **Performance Hub** - Chat interface with OptiLLM optimization (20+ techniques)
+1. **Performance Hub** - Chat interface with integrated OptiLLM optimization (10+ techniques)
 2. **Agentic Workflow Engine** - Multi-step workflows with approval gates and external tool integration
 
-**Key Differentiator**: Not another ChatGPT clone. Merlin demonstrates advanced AI engineering with workflow orchestration, external API integration, and inference optimization.
+**Key Differentiator**: Not another ChatGPT clone. Merlin demonstrates advanced AI engineering with workflow orchestration, external API integration, and inference optimization directly integrated into the backend.
 
 ## Architecture
 
@@ -20,8 +20,8 @@ Merlin is a production-ready AI workbench with:
 │                                                                   │
 │  Pillar 1: Performance Hub                                       │
 │  ├─ Next.js 15 Frontend (SSE streaming, session management)     │
-│  ├─ FastAPI Backend (encrypted keys, chat API)                  │
-│  └─ OptiLLM Proxy (inference optimization)                      │
+│  ├─ FastAPI Backend (encrypted keys, chat API, rate limiting)   │
+│  └─ Integrated OptiLLM (inference optimization, direct calls)   │
 │                                                                   │
 │  Pillar 2: Agentic Workflow Engine                              │
 │  ├─ Workflow Orchestrator (6 step types, approval gates)        │
@@ -34,35 +34,39 @@ Merlin is a production-ready AI workbench with:
 ## Technology Stack
 
 - **Frontend**: Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, Zustand
-- **Backend**: FastAPI, SQLAlchemy, Pydantic, Cryptography (Fernet), httpx
-- **AI Proxy**: OptiLLM (inference optimization techniques)
+- **Backend**: FastAPI, SQLAlchemy, Pydantic, Cryptography (Fernet), slowapi (rate limiting)
+- **AI Inference**: OptiLLM (integrated, direct function calls - no proxy server)
 - **External APIs**: GPTZero (AI detection), Undetectable AI (humanization)
 - **Database**: SQLite (upgradable to PostgreSQL for production)
-- **Infrastructure**: Docker, Docker Compose
+- **Infrastructure**: Docker, Docker Compose, Render (free tier), Vercel
 
 ## Features
 
 ### Performance Hub (Chat Interface)
-- 🔐 **BYOK Management**: Securely store API keys for OpenAI, Anthropic, Google
-- 💬 **Multi-Model Chat**: Real-time streaming with GPT-4o, Claude 3.5, Gemini 2.0
-- ⚡ **OptiLLM Techniques**: 20+ optimization techniques (plansearch, cot_reflection, moa, etc.)
+- 🔐 **BYOK Management**: Securely store API keys for OpenAI, Anthropic, Google with Fernet encryption
+- 💬 **Multi-Model Chat**: Real-time streaming with GPT-4o, Claude 3.5, Gemini 2.5
+- ⚡ **OptiLLM Techniques**: Directly integrated (MOA, CoT Reflection, PlanSearch, etc.)
 - 💾 **Chat Sessions**: Organize conversations, auto-save, load history
-- 🎨 **Apple-Inspired UI**: Minimal, clean interface with collapsible advanced settings
+- 🎨 **Landing Page**: DeepSeek-inspired marketing homepage with product showcase
+- ⏱️ **Rate Limiting**: 30 requests/hour per user (aligned with Neon Free Tier)
+- 🔄 **Retry Mechanism**: Inline retry button for failed messages
+- ⚙️ **Server Wake Detection**: Handles Render cold starts gracefully (60s timeout)
 
 ### Agentic Workflow Engine
 - 🤖 **6 Step Types**: PLAN, DRAFT, VERIFY, HUMANIZE, INTEGRITY_CHECK, AI_DETECTION
 - ✅ **Approval Gates**: Pause at each step for user review
 - 🔄 **State Persistence**: Resume workflows after interruption
-- 🎯 **Multi-Model Orchestration**: Different models per step (GPT-4o for planning, Claude for writing)
+- 🎯 **Multi-Model Orchestration**: Different models per step
 - 🛠️ **External Tool Integration**: GPTZero for AI detection, Undetectable AI for humanization
-- � **Essay Writer Template**: Complete 6-step workflow ready to use
+- 📝 **Essay Writer Template**: Complete 6-step workflow ready to use
 
-### Security & Production
+### Production-Ready
 - 🔒 **Fernet Encryption**: AES-128-CBC for API keys at rest
 - 🌐 **CORS Protection**: Configurable allowed origins
+- 📊 **Rate Limiting**: Per-user rate limits with slowapi
 - 🧪 **Comprehensive Testing**: Backend tests with pytest, fixtures, mocking
 - 📦 **Docker Support**: Multi-container setup with docker-compose
-- 🚀 **Deployment Ready**: Free tier guides for Render, Railway, Vercel
+- 🚀 **Free Tier Optimized**: Deployed on Render free tier with cost-conscious limits
 
 ## Prerequisites
 
@@ -100,11 +104,10 @@ docker-compose up --build
 The application will be available at:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8001
-- OptiLLM Proxy: http://localhost:8000
 
 ### 4. Development Setup (without Docker)
 
-**Backend:**
+**Backend (with integrated OptiLLM):**
 ```bash
 cd backend
 pip install -e .
@@ -118,22 +121,18 @@ npm install
 npm run dev
 ```
 
-**OptiLLM (Docker):**
-```bash
-docker run -p 8000:8000 \
-  -e OPTILLM_BASE_URL=https://api.openai.com/v1 \
-  ghcr.io/codelion/optillm:latest-proxy
-```
+Note: OptiLLM is now directly integrated into the FastAPI backend - no separate proxy server needed!
 
 ## Project Structure
 
 ```
-P1/
+merlin/
 ├── frontend/               # Next.js 15 application
 │   ├── src/
 │   │   ├── app/           # App Router pages
-│   │   │   ├── (chat)/    # Chat route group
-│   │   │   └── (settings)/ # Settings route group
+│   │   │   ├── (chat)/    # Chat interface
+│   │   │   ├── (settings)/ # Settings pages
+│   │   │   └── page.tsx   # Landing page
 │   │   ├── components/    # React components
 │   │   └── lib/           # Utilities and state
 │   └── package.json
@@ -142,8 +141,10 @@ P1/
 │   │   ├── api/          # API routes
 │   │   ├── core/         # Config and security
 │   │   ├── db/           # Database models
+│   │   ├── optillm/      # Integrated OptiLLM techniques
 │   │   ├── repositories/ # Data access layer
-│   │   ├── services/     # Business logic
+│   │   ├── services/     # Business logic (including OptiLLMService)
+│   │   └── main.py       # FastAPI app entry
 │   │   └── schemas/      # Pydantic models
 │   └── pyproject.toml
 ├── docker-compose.yml     # Orchestration
@@ -214,7 +215,6 @@ POST /api/v1/workflows/{workflow_id}/steps/{step_index}/approve
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Free deployment options (Render, Railway, Vercel)
 - **[EXTERNAL_APIS.md](./EXTERNAL_APIS.md)** - GPTZero and Undetectable AI integration
 - **[IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md)** - Complete feature overview
-- **[.github/copilot-instructions.md](./.github/copilot-instructions.md)** - Developer guide
 
 ## External API Integration
 
@@ -245,8 +245,7 @@ MIT
 
 Contributions are welcome! Please:
 
-1. Read the developer guide in `.github/copilot-instructions.md`
-2. Follow code style (Black for Python, Prettier for TypeScript)
+1. Follow code style (Black for Python, Prettier for TypeScript)
 3. Add tests for new features
 4. Open an issue or submit a pull request
 

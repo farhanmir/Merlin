@@ -1,3 +1,26 @@
+"""
+Chat API endpoints for LLM completions with OptiLLM optimization.
+
+This module provides endpoints for:
+- Chat completions with direct OptiLLM integration
+- Streaming responses via Server-Sent Events (SSE)
+- Model discovery and provider information
+- Message history management per session
+- Per-user rate limiting
+
+OptiLLM Techniques:
+All techniques are applied sequentially in the order specified.
+Techniques can be combined for more sophisticated reasoning.
+
+Examples:
+- Single technique: ["moa"]
+- Multiple techniques: ["plansearch", "cot_reflection", "mcts"]
+
+Rate Limits:
+- 30 requests per hour per user
+- Applies to all endpoints in this router
+"""
+
 from typing import Any
 
 import httpx

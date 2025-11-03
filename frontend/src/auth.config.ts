@@ -4,10 +4,22 @@ import Credentials from 'next-auth/providers/credentials';
 
 export const authConfig: NextAuthConfig = {
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    // Only add Google provider if credentials are configured
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            authorization: {
+              params: {
+                prompt: "consent",
+                access_type: "offline",
+                response_type: "code"
+              }
+            }
+          }),
+        ]
+      : []),
     Credentials({
       name: 'Email & Password',
       credentials: {
@@ -83,6 +95,9 @@ export const authConfig: NextAuthConfig = {
       }
       if (account?.provider === 'google') {
         token.provider = 'google';
+        // For Google OAuth, we need to create a backend user
+        // This is a placeholder - you'd need to implement Google OAuth on backend
+        token.id = user?.id || token.sub;
       }
       return token;
     },

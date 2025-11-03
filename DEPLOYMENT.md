@@ -91,10 +91,13 @@ DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE
 # Run: python -c "import secrets; print(secrets.token_hex(32))"
 JWT_SECRET_KEY=your-jwt-secret-here
 
-# Keep these the same:
+# Encryption key (keep existing, already set)
 FERNET_KEY=<your-existing-fernet-key-from-render>
+
+# CORS origins
 CORS_ORIGINS=["http://localhost:3000","https://merlin-gamma.vercel.app"]
-OPTILLM_URL=http://localhost:8000
+
+# Note: OptiLLM is now directly integrated - no separate OPTILLM_URL needed!
 ```
 
 **After updating:**
