@@ -143,6 +143,10 @@ async def chat_completions(
     # If no OptiLLM techniques are selected, bypass OptiLLM and call provider directly
     if not request.techniques or len(request.techniques) == 0:
         try:
+            # Disable streaming for Google/Anthropic (different SSE format than OpenAI)
+            # They require response transformation which is easier with non-streaming
+            use_streaming = request.stream and provider == "openai"
+
             # Call provider API directly based on provider type
             if provider == "openai":
                 headers = {
@@ -152,7 +156,7 @@ async def chat_completions(
                 payload = {
                     "model": base_model,
                     "messages": [msg.model_dump() for msg in request.messages],
-                    "stream": request.stream,
+                    "stream": use_streaming,
                 }
                 url = "https://api.openai.com/v1/chat/completions"
 
@@ -166,7 +170,7 @@ async def chat_completions(
                     "model": base_model,
                     "messages": [msg.model_dump() for msg in request.messages],
                     "max_tokens": 4096,
-                    "stream": request.stream,
+                    "stream": False,  # Anthropic streaming format is different
                 }
                 url = "https://api.anthropic.com/v1/messages"
 
@@ -186,6 +190,7 @@ async def chat_completions(
                     )
                 payload = {
                     "contents": contents,
+                    # Google doesn't support streaming in the same way - disable it
                 }
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{base_model}:generateContent?key={api_key}"
 
@@ -203,7 +208,8 @@ async def chat_completions(
                 )
                 response.raise_for_status()
 
-                if request.stream:
+                # Only OpenAI supports streaming with transformation
+                if use_streaming:
                     from fastapi.responses import StreamingResponse
 
                     async def stream_generator() -> Any:
