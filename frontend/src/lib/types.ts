@@ -42,9 +42,7 @@ export interface ApiKey {
 }
 
 export type Technique =
-  // Advanced Multi-Agent & Planning
-  | 'mars'      // Disabled - missing dependencies
-  | 'cepo'      // Disabled - missing dependencies
+  // Planning
   | 'plansearch'
   // Core Reasoning
   | 'cot_reflection'
@@ -52,15 +50,19 @@ export type Technique =
   // Sampling & Verification
   | 'bon'
   | 'self_consistency'
-  // | 'pvg'    // Disabled - exceeds free tier rate limits
   // Search & Optimization
   | 'mcts'
   | 'rstar'
   | 'rto'
   // Specialized Techniques
-  | 'leap'
-  // | 're2'   // Disabled - exceeds free tier rate limits
-  | 'z3';
+  | 'leap';
+  
+  // DISABLED TECHNIQUES (do not use):
+  // 'mars'      - missing dependencies
+  // 'cepo'      - missing dependencies  
+  // 'pvg'       - exceeds free tier rate limits
+  // 're2'       - exceeds free tier rate limits
+  // 'z3'        - not integrated in OptiLLMService
 
 export interface ChatRequest {
   model: string;

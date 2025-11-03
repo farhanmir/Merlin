@@ -14,20 +14,21 @@ const TECHNIQUES: Array<{
   category: string;
 }> = [
   // Core Reasoning Techniques
-  {
-    id: 'mars',
-    name: 'MARS',
-    description: 'Multi-Agent Reasoning System with diverse temperature exploration',
-    icon: '🪐',
-    category: 'Advanced',
-  },
-  {
-    id: 'cepo',
-    name: 'CePO',
-    description: 'Cerebras Planning and Optimization (Best of N + CoT + Self-Reflection)',
-    icon: '🧠',
-    category: 'Advanced',
-  },
+  // NOTE: MARS and CePO disabled - missing dependencies in backend
+  // {
+  //   id: 'mars',
+  //   name: 'MARS',
+  //   description: 'Multi-Agent Reasoning System with diverse temperature exploration',
+  //   icon: '🪐',
+  //   category: 'Advanced',
+  // },
+  // {
+  //   id: 'cepo',
+  //   name: 'CePO',
+  //   description: 'Cerebras Planning and Optimization (Best of N + CoT + Self-Reflection)',
+  //   icon: '🧠',
+  //   category: 'Advanced',
+  // },
   {
     id: 'plansearch',
     name: 'PlanSearch',
@@ -113,13 +114,14 @@ const TECHNIQUES: Array<{
   //   icon: '📖',
   //   category: 'Processing',
   // },
-  {
-    id: 'z3',
-    name: 'Z3 Solver',
-    description: 'Formal logic using Z3 theorem prover',
-    icon: '🔬',
-    category: 'Logic',
-  },
+  // NOTE: Z3 disabled - not integrated in OptiLLMService
+  // {
+  //   id: 'z3',
+  //   name: 'Z3 Solver',
+  //   description: 'Formal logic using Z3 theorem prover',
+  //   icon: '🔬',
+  //   category: 'Logic',
+  // },
 ];
 
 export function TechniquePanel() {

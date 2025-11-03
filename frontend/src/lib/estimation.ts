@@ -46,17 +46,7 @@ interface TechniqueOverhead {
 }
 
 const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
-  // Advanced Multi-Agent & Planning (highest overhead)
-  'mars': {
-    multiplier: 5, // Multiple agents at different temperatures
-    fixedMs: 2000,
-    description: '5 agents with diverse reasoning',
-  },
-  'cepo': {
-    multiplier: 7, // BoN (3) + CoT + Reflection + Planning
-    fixedMs: 3000,
-    description: 'Best of 3 + CoT + Self-Reflection',
-  },
+  // Planning (medium-high overhead)
   'plansearch': {
     multiplier: 4, // Multiple plan candidates
     fixedMs: 1500,
@@ -122,11 +112,12 @@ const TECHNIQUE_OVERHEAD: Record<Technique, TechniqueOverhead> = {
   //   fixedMs: 400,
   //   description: 'Read twice strategy',
   // },
-  'z3': {
-    multiplier: 1.5, // SMT solver integration
-    fixedMs: 1500,
-    description: 'Logical constraint solving',
-  },
+  // NOTE: Z3 disabled - not integrated in OptiLLMService
+  // 'z3': {
+  //   multiplier: 1.5, // SMT solver integration
+  //   fixedMs: 1500,
+  //   description: 'Logical constraint solving',
+  // },
 };
 
 /**
