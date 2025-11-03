@@ -140,7 +140,74 @@ async def chat_completions(
             status_code=500, detail=f"Failed to decrypt API key: {str(e)}"
         )
 
-    # Call OptiLLM service
+    # If no OptiLLM techniques are selected, bypass OptiLLM and call provider directly
+    if not request.techniques or len(request.techniques) == 0:
+        # Direct provider call without OptiLLM
+        provider_urls = {
+            "openai": "https://api.openai.com/v1/chat/completions",
+            "anthropic": "https://api.anthropic.com/v1/messages",
+            "google": "https://generativelanguage.googleapis.com/v1beta/models",
+        }
+
+        if provider not in provider_urls:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Direct API calls not supported for provider: {provider}",
+            )
+
+        try:
+            # Call provider API directly
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+
+            # Anthropic uses different header format
+            if provider == "anthropic":
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                }
+
+            payload = {
+                "model": base_model,
+                "messages": [msg.model_dump() for msg in request.messages],
+                "stream": request.stream,
+            }
+
+            # Anthropic uses max_tokens instead of max_completion_tokens
+            if provider == "anthropic":
+                payload["max_tokens"] = 4096
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    provider_urls[provider],
+                    json=payload,
+                    headers=headers,
+                )
+                response.raise_for_status()
+
+                if request.stream:
+                    from fastapi.responses import StreamingResponse
+
+                    async def stream_generator() -> Any:
+                        async for chunk in response.aiter_bytes():
+                            yield chunk
+
+                    return StreamingResponse(
+                        stream_generator(),
+                        media_type="text/event-stream",
+                    )
+                else:
+                    return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Provider API error: {str(e)}",
+            )
+
+    # Call OptiLLM service when techniques are selected
     try:
         response = await optillm_service.chat_completion(
             model=request.model,
@@ -166,20 +233,29 @@ async def chat_completions(
             # Return complete response
             return response
     except httpx.HTTPStatusError as e:
-        # OptiLLM returned an error status code
-        error_detail = f"OptiLLM error: {e.response.status_code}"
+        # API returned an error status code
+        error_source = "OptiLLM" if request.techniques else "Provider API"
+        error_detail = f"{error_source} error: {e.response.status_code}"
         try:
             error_body = e.response.json()
             if "error" in error_body:
-                error_detail = f"OptiLLM error: {error_body['error']}"
+                error_detail = f"{error_source} error: {error_body['error']}"
         except Exception:
-            error_detail = f"OptiLLM error: {e.response.text[:200]}"
+            error_detail = f"{error_source} error: {e.response.text[:200]}"
 
         raise HTTPException(status_code=500, detail=error_detail)
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=500, detail=f"OptiLLM request failed: {str(e)}")
+        error_source = "OptiLLM" if request.techniques else "Provider API"
+        raise HTTPException(
+            status_code=500, detail=f"{error_source} request failed: {str(e)}"
+        )
     except Exception as e:
+        error_hint = (
+            "Try using fewer OptiLLM techniques or a different model."
+            if request.techniques
+            else "Check your API key and model selection."
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error: {str(e)}. Try using fewer OptiLLM techniques or a different model.",
+            detail=f"Unexpected error: {str(e)}. {error_hint}",
         )
