@@ -9,13 +9,16 @@ import { User, Copy, Check, Sparkles, RotateCw, AlertCircle } from 'lucide-react
 interface MessageProps {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: Date;
+  timestamp: Date | string;
   isError?: boolean;
   onRetry?: () => void;
 }
 
 export function Message({ role, content, timestamp, isError = false, onRetry }: Readonly<MessageProps>) {
   const [copied, setCopied] = useState(false);
+  
+  // Ensure timestamp is always a Date object (handles string from localStorage/API)
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -54,7 +57,7 @@ export function Message({ role, content, timestamp, isError = false, onRetry }: 
           </span>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
             <button
               onClick={handleCopy}

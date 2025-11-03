@@ -95,3 +95,38 @@ async def login(credentials: UserLogin, user_repo: UserRepoDep) -> Token:
         user_id=str(user.id),
         email=user.email,
     )
+
+
+@router.post("/oauth", response_model=Token)
+async def oauth_login(user_data: UserRegister, user_repo: UserRepoDep) -> Token:
+    """Register or login a user via OAuth (Google, etc.).
+
+    Args:
+        user_data: User data from OAuth provider (email, no password needed)
+        user_repo: User repository dependency
+
+    Returns:
+        JWT access token and user information
+    """
+    # Check if user exists
+    user = await user_repo.get_by_email(user_data.email)
+
+    if not user:
+        # Create new user with a random password (won't be used for OAuth)
+        import secrets
+
+        random_password = secrets.token_urlsafe(32)
+        hashed_password = hash_password(random_password)
+        user = await user_repo.create(
+            email=user_data.email, hashed_password=hashed_password
+        )
+
+    # Create JWT token
+    access_token = create_access_token(data={"sub": str(user.id), "email": user.email})
+
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=str(user.id),
+        email=user.email,
+    )

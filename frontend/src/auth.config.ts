@@ -95,18 +95,40 @@ export const authConfig: NextAuthConfig = {
       }
       if (account?.provider === 'google') {
         token.provider = 'google';
-        // For Google OAuth, we need to create a backend user
-        // This is a placeholder - you'd need to implement Google OAuth on backend
         token.id = user?.id || token.sub;
+        token.email = user?.email;
       }
       return token;
     },
-    session({ session, token }) {
+    async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        if (token.accessToken) {
+        
+        // For Google OAuth, get backend token if we don't have one
+        if (token.provider === 'google' && !token.accessToken && token.email) {
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+            const response = await fetch(`${apiUrl}/api/v1/auth/oauth`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: token.email,
+                password: 'unused', // OAuth users don't use password
+              }),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              token.accessToken = data.access_token;
+              session.accessToken = data.access_token as string;
+            }
+          } catch (error) {
+            console.error('OAuth backend registration failed:', error);
+          }
+        } else if (token.accessToken) {
           session.accessToken = token.accessToken as string;
         }
+        
         session.provider = token.provider as string;
       }
       return session;
