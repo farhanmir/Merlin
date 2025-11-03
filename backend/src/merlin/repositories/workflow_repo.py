@@ -1,6 +1,6 @@
 """Repository for workflow database operations."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from merlin.db.workflow_models import Workflow, WorkflowStatus, WorkflowStep
 from sqlalchemy import select
@@ -114,16 +114,16 @@ class WorkflowRepository:
             return None
 
         workflow.status = status
-        workflow.updated_at = datetime.utcnow()
+        workflow.updated_at = datetime.now(timezone.utc)
 
         if status == WorkflowStatus.RUNNING and not workflow.started_at:
-            workflow.started_at = datetime.utcnow()
+            workflow.started_at = datetime.now(timezone.utc)
         elif status in [
             WorkflowStatus.COMPLETED,
             WorkflowStatus.FAILED,
             WorkflowStatus.CANCELLED,
         ]:
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = datetime.now(timezone.utc)
 
         if error_message:
             workflow.error_message = error_message
@@ -147,12 +147,12 @@ class WorkflowRepository:
             return None
 
         workflow.current_step_index += 1
-        workflow.updated_at = datetime.utcnow()
+        workflow.updated_at = datetime.now(timezone.utc)
 
         # Check if workflow is complete
         if workflow.current_step_index >= len(workflow.steps):
             workflow.status = WorkflowStatus.COMPLETED
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = datetime.now(timezone.utc)
 
         await self.session.commit()
         await self.session.refresh(workflow)

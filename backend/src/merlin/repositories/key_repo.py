@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from merlin.db.models import ApiKey
@@ -40,7 +40,7 @@ class ApiKeyRepository:
         if existing:
             existing.encrypted_key = encrypted_key
             existing.is_valid = is_valid
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
             await self.session.commit()
             await self.session.refresh(existing)
             return existing
