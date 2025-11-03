@@ -167,18 +167,64 @@ merlin/
 4. **Linting**: `npm run lint` (frontend), `ruff check src` (backend)
 5. **Testing**: `npm test` (frontend), `pytest` (backend)
 
-## OptiLLM Techniques
+## OptiLLM Techniques - Usage Guidelines
 
-## OptiLLM Techniques
+Merlin supports 9 optimization techniques via OptiLLM, integrated directly into the backend. 
+Techniques are applied sequentially in the order specified and can dramatically improve response quality.
 
-Merlin supports 20+ optimization techniques via OptiLLM:
+### Light Techniques (1-5 API calls)
+- **cot_reflection**: Chain-of-Thought with reflection (2 calls)
+- **leap**: Learning from examples (2-4 calls)
+- **rto**: Round-trip optimization (4 calls)
 
-- **PlanSearch**: Complex problem-solving with planning
-- **CoT-Reflection**: Chain-of-thought with self-reflection
-- **Mixture of Agents (MoA)**: Multi-agent collaboration
-- **Self-Consistency**: Sample multiple reasoning paths
-- **LEAP**: Learning to reason via latent exploration
-- **R-STAR**: Recursive self-training for reasoning
+### Medium Techniques (5-10 API calls)
+- **moa**: Mixture of Agents (5-7 calls)
+- **bon**: Best-of-N sampling (6 calls)
+- **self_consistency**: Advanced consistency (3-5 calls)
+- **plansearch**: Plan-based search (8 calls)
+
+### Heavy Techniques (10-20+ API calls)
+- **mcts**: Monte Carlo Tree Search (10-15 calls)
+- **rstar**: Reinforcement Learning Star (10-15 calls)
+
+### Recommended Combinations for Free Tier (Google: 15 RPM)
+- **Light**: `plansearch` + `cot_reflection` (10 calls)
+- **Medium**: `moa` + `bon` (12 calls)
+- **Heavy**: `mcts` alone (15 calls)
+
+### ❌ Avoid These Combinations (will hit rate limits)
+- `plansearch` + `cot_reflection` + `moa` + `bon` + `self_consistency` + `mcts` (40+ calls)
+- Any 3+ medium/heavy techniques together
+- `mcts` + `rstar` (25+ calls)
+
+### 💡 Tips
+- Start with 1-2 techniques and add more gradually
+- Wait 1-2 minutes between heavy technique runs
+- Use OpenAI/Anthropic for heavy technique chains (higher rate limits)
+- Select techniques in the Advanced Settings panel of the chat interface
+
+## Troubleshooting
+
+### OptiLLM Errors
+
+**Error: "Value is not a struct"**
+- **Cause**: Google Gemini rejected a message containing code blocks from a previous technique
+- **Solution**: Avoid using `plansearch` with Google, or use it as the last technique in the chain
+- **Note**: Fixed in latest version with automatic code block sanitization
+
+**Error: "Rate limit exceeded"**
+- **Cause**: Too many API calls in a short time (Google Free: 15 requests/minute)
+- **Solution**: Use fewer techniques, wait 1-2 minutes, or upgrade to paid tier
+
+**Error: "Could not generate any completions"**
+- **Cause**: Provider rejected all completion attempts
+- **Solution**: Check your API key, verify provider status, try a different model
+
+**Techniques taking too long**
+- **Cause**: Heavy techniques (mcts, rstar) make many API calls
+- **Solution**: Use lighter techniques, or use heavy techniques individually
+
+### General Issues
 
 Enable techniques in the chat interface (Advanced Settings panel) to optimize inference quality and cost.
 
