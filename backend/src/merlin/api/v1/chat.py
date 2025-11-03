@@ -220,7 +220,9 @@ async def chat_completions(
             raise HTTPException(
                 status_code=500,
                 detail=f"Provider API error: {str(e)}",
-            )  # Call OptiLLM service when techniques are selected
+            )
+
+    # Call OptiLLM service when techniques are selected
     try:
         response = await optillm_service.chat_completion(
             model=request.model,
