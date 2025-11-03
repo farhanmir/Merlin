@@ -204,7 +204,131 @@ class OptiLLMService:
 
         return system_prompt, initial_query
 
-    def _clean_response_for_chaining(self, response: str, provider: str) -> str:
+    def _extract_answer_from_code(self, code_block: str) -> str | None:
+        """
+        Extract the final answer from a Python code block.
+
+        Handles various patterns:
+        - return "HEROINE"
+        - print(f"The word is: {riddle_solution}")
+        - full_word = "HEROINE"
+        - Function docstrings explaining the answer
+
+        Args:
+            code_block: Python code as string
+
+        Returns:
+            Extracted answer or None if not found
+        """
+        import re
+
+        # Remove language identifier if present (python, py, etc.)
+        code_block = re.sub(r"^(python|py)\s*\n", "", code_block, flags=re.IGNORECASE)
+
+        # Pattern 1: Look for return statements with string literals
+        return_match = re.search(
+            r'return\s+["\']([^"\']+)["\']', code_block, re.IGNORECASE
+        )
+        if return_match:
+            answer = return_match.group(1)
+            logger.info(f"Extracted answer from return statement: {answer}")
+            return f"The answer is: {answer}"
+
+        # Pattern 2: Look for print statements with the answer
+        print_patterns = [
+            r'print\(["\']([^"\']+)["\']',  # print("HEROINE")
+            r'print\(f["\'][^"\']*\{([^}]+)\}[^"\']*["\']',  # print(f"Answer: {var}")
+            r'print\([^)]*["\']([A-Z]+)["\']',  # print("The answer is:", "HEROINE")
+        ]
+        for pattern in print_patterns:
+            match = re.search(pattern, code_block, re.IGNORECASE)
+            if match:
+                answer = match.group(1)
+                logger.info(f"Extracted answer from print statement: {answer}")
+                return f"The answer is: {answer}"
+
+        # Pattern 3: Look for variable assignments at module level
+        var_match = re.search(
+            r'^(?:word|answer|result|solution|riddle_solution|final_answer|full_word)\s*=\s*["\']([^"\']+)["\']',
+            code_block,
+            re.IGNORECASE | re.MULTILINE,
+        )
+        if var_match:
+            answer = var_match.group(1)
+            logger.info(f"Extracted answer from variable assignment: {answer}")
+            return f"The answer is: {answer}"
+
+        # Pattern 4: Look for function docstrings that might explain the answer
+        docstring_match = re.search(r'"""(.*?)"""', code_block, re.DOTALL)
+        if docstring_match:
+            docstring = docstring_match.group(1).strip()
+            # Check if docstring contains an answer pattern
+            if any(
+                keyword in docstring.lower()
+                for keyword in ["answer", "word", "solution"]
+            ):
+                logger.info("Found answer explanation in docstring")
+                return docstring
+
+        # Pattern 5: Look for comments that explain the answer
+        comment_match = re.search(
+            r"#\s*(Answer|Solution|Word|Result):\s*(.+)", code_block, re.IGNORECASE
+        )
+        if comment_match:
+            answer = comment_match.group(2).strip()
+            logger.info(f"Extracted answer from comment: {answer}")
+            return f"The answer is: {answer}"
+
+        return None
+
+    def _format_message_for_provider(self, message: str, provider: str) -> str:
+        """
+        Format message according to provider-specific requirements.
+
+        Google Gemini requires plain text without embedded code blocks when used
+        via OpenAI-compatible endpoint.
+
+        Args:
+            message: Original message content
+            provider: LLM provider name
+
+        Returns:
+            Formatted message suitable for the provider
+        """
+        import re
+
+        if provider == "google" and "```" in message:
+            # For Google, convert code blocks to plain text descriptions
+            logger.info("Converting code blocks to plain text for Google Gemini")
+
+            # Extract text before code blocks
+            parts = message.split("```")
+            if len(parts) > 1:
+                text_parts = [parts[0]]  # Text before first block
+
+                for i in range(2, len(parts), 2):  # Text between and after blocks
+                    if parts[i].strip():
+                        text_parts.append(parts[i])
+
+                combined = " ".join(text_parts).strip()
+                if combined and len(combined) > 30:
+                    return combined
+
+            # If extraction failed, remove code blocks entirely
+            cleaned = re.sub(
+                r"```[^`]*```",
+                "[code implementation omitted]",
+                message,
+                flags=re.DOTALL,
+            )
+            return cleaned.strip()
+
+        # For other providers, pass through unchanged
+        return message
+
+    def _clean_response_for_chaining(
+        self, response: str, provider: str, technique: str = ""
+    ) -> str:
         """
         Clean technique response before passing to next technique.
 
@@ -224,7 +348,9 @@ class OptiLLMService:
         # If response contains code blocks, extract just the conceptual answer
         # Code blocks cause "Value is not a struct" errors with Google Gemini
         if "```" in response:
-            logger.info("Response contains code blocks, cleaning for next technique")
+            logger.info(
+                f"Response from {technique} contains code blocks, cleaning for next technique"
+            )
 
             # Try to find explanatory text before code blocks
             parts = response.split("```")
@@ -235,6 +361,16 @@ class OptiLLMService:
                     # If there's substantial text before code, use that
                     logger.info("Using text before code blocks")
                     return before_code
+
+                # For plansearch specifically, try to extract the answer from code
+                if technique == "plansearch":
+                    for i in range(1, len(parts), 2):
+                        code_block = parts[i] if i < len(parts) else ""
+
+                        # Use the new helper to extract answer from code
+                        extracted = self._extract_answer_from_code(code_block)
+                        if extracted:
+                            return extracted
 
                 # Otherwise, try to extract the answer from within code blocks
                 # Look for variable assignments like: word = "heroine"
@@ -373,7 +509,7 @@ class OptiLLMService:
                     # Clean response before passing to next technique
                     # This prevents code blocks from causing API errors in subsequent techniques
                     final_response = self._clean_response_for_chaining(
-                        response, provider
+                        response, provider, technique
                     )
 
                     logger.info(f"✓ {technique} completed successfully")
@@ -400,11 +536,56 @@ class OptiLLMService:
                     await asyncio.sleep(wait_time)
 
                 except APIError as e:
-                    logger.error(f"API error in {technique}: {str(e)}")
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"LLM API error in {technique}: {str(e)}",
-                    ) from e
+                    # Distinguish between user errors and system errors
+                    status_code = getattr(e, "status_code", None)
+
+                    if status_code == 400:
+                        # User/validation error - fail fast
+                        error_msg = str(e)
+                        if (
+                            "Value is not a struct" in error_msg
+                            or "struct" in error_msg.lower()
+                        ):
+                            logger.error(
+                                f"Google Gemini rejected message with code blocks in {technique}"
+                            )
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Provider rejected request in {technique}. This may be due to code blocks in the response. "
+                                f"Try using {technique} as the last technique, or use a different provider.",
+                            ) from e
+                        else:
+                            logger.error(
+                                f"Provider validation error in {technique}: {error_msg}"
+                            )
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Provider rejected request in {technique}: {error_msg}",
+                            ) from e
+
+                    elif status_code == 429:
+                        # Rate limit - should have been caught above, but handle as fallback
+                        logger.error(f"Rate limit error in {technique}")
+                        raise HTTPException(
+                            status_code=429,
+                            detail=f"Rate limit exceeded in {technique}. Please wait and try again.",
+                        ) from e
+
+                    elif status_code and status_code >= 500:
+                        # Provider server error
+                        logger.error(f"Provider server error in {technique}: {str(e)}")
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"Provider service error in {technique}. The API may be experiencing issues.",
+                        ) from e
+
+                    else:
+                        # Generic API error
+                        logger.error(f"API error in {technique}: {str(e)}")
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"LLM API error in {technique}: {str(e)}",
+                        ) from e
 
         logger.info(f"All {len(techniques)} techniques completed successfully")
         return final_response

@@ -21,6 +21,7 @@ Rate Limits:
 - Applies to all endpoints in this router
 """
 
+import logging
 from typing import Any
 
 import httpx
@@ -45,6 +46,7 @@ from merlin.schemas.chat import (
     SessionListResponse,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Model definitions for each provider
@@ -366,18 +368,24 @@ async def chat_completions(
                 }
             ],
         }
+    except HTTPException:
+        # Re-raise HTTPExceptions from optillm_service (already well-formatted)
+        raise
     except ValueError as e:
         # Invalid technique or configuration
+        logger.error(f"OptiLLM configuration error: {str(e)}")
         raise HTTPException(
             status_code=400,
-            detail=f"OptiLLM configuration error: {str(e)}",
-        )
+            detail=f"Configuration error: {str(e)}",
+        ) from e
     except Exception as e:
-        error_hint = "Try using fewer OptiLLM techniques or a different model."
+        # Catch-all for unexpected errors
+        logger.exception(f"Unexpected error in OptiLLM execution: {str(e)}")
+        error_hint = "Try using fewer OptiLLM techniques or a different provider."
         raise HTTPException(
             status_code=500,
             detail=f"OptiLLM execution error: {str(e)}. {error_hint}",
-        )
+        ) from e
 
 
 # Chat history endpoints
