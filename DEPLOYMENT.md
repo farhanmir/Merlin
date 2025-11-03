@@ -91,7 +91,7 @@ DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST/DATABASE
 JWT_SECRET_KEY=a77271822bec91e9f2b99b07cc4a3ee63ad359d2f465f9c427224904796abf0c
 
 # Keep these the same:
-FERNET_KEY=tvwCdzoogeloKMIzmYpW24E82cLfZ9O_tiGHAvrgP7A=
+FERNET_KEY=<your-existing-fernet-key-from-render>
 CORS_ORIGINS=["http://localhost:3000","https://merlin-gamma.vercel.app"]
 OPTILLM_URL=http://localhost:8000
 ```
@@ -204,8 +204,9 @@ After successful deployment:
 # JWT Secret Key (64 characters)
 JWT_SECRET_KEY=a77271822bec91e9f2b99b07cc4a3ee63ad359d2f465f9c427224904796abf0c
 
-# Fernet Key (keep existing)
-FERNET_KEY=tvwCdzoogeloKMIzmYpW24E82cLfZ9O_tiGHAvrgP7A=
+# Fernet Key (keep existing or generate new)
+# To generate new: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FERNET_KEY=<use-your-existing-key-from-render-or-generate-new>
 ```
 
 **⚠️ IMPORTANT:** Never commit these to Git! They're for Render environment variables only.
